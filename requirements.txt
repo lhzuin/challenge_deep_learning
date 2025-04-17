@@ -1,0 +1,7 @@
+hydra - core
+matplotlib
+tqdm
+pandas
+pre-commit
+black
+flake8
