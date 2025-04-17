@@ -30,13 +30,13 @@ pip install -r requirements.txt
 Download the data from kaggle and copy them in the dataset folder. 
 Note: the dataset directory content was included in the .gitignore file, and so it is not included in the repository -- won't be pushed.
 
-```bash
 
 # Using the codebase
 This codebase aims to train models and  rely on a config management library called hydra. It allow you to have modular code where you can easily swap methods, hparams, etc.
 
 ## Training
 To train your model you can run
+
 ```bash
 python train.py
 ```
