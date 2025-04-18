@@ -51,5 +51,5 @@ python train.py prefix=your_prefix
 ## Create submission
 To create a submition file, you can run:
 ```bash
-python create_submition.py model=config_of_the_exp checkpoint_path="checkpoints/your_checkpoint.pth"
+python create_submission.py model=config_of_the_exp checkpoint_path="checkpoints/your_checkpoint.pth"
 ```

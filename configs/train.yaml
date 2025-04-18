@@ -3,7 +3,7 @@ defaults:
     - dataset: default
     - optim: adamw
     - model: dinov2
-    - loss_fn: mae
+    - loss_fn: msle
 
 epochs: 20
 log: True
