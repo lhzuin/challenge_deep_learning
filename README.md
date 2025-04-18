@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ``` 
 
 ### Download the data
-Download the data from kaggle and copy them in the dataset folder. 
+Download the data from kaggle and copy them in the dataset folder (unzip the files).
 Note: the dataset directory content was included in the .gitignore file, and so it is not included in the repository -- won't be pushed.
 
 
