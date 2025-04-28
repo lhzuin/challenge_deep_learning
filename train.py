@@ -57,7 +57,6 @@ def train(cfg):
             num_samples_train += len(batch["image"])
             pbar.set_postfix({"train/loss_step": loss.detach().cpu().numpy()})
         epoch_train_loss /= num_samples_train
-        print(epoch_train_loss)
         (
             logger.log(
                 {
