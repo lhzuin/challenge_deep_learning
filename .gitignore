@@ -1,9 +1,10 @@
 # -- custom 
 dataset/*
 submission.csv
-checkpoints/*
+checkpoints/*.pt
 *.DS_Store
 *.ipynb_checkpoints
+utils/check_solution.py
 # -- end custom
 
 *.log

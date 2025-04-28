@@ -6,7 +6,7 @@ This codebase allows you to jumpstart the CSC_43M04_EP data challenge. The goal 
 Cloning the repo:
 ```bash 
 git clone https://github.com/jumdc/CSC_43M04_EP_challenge.git
-cd CSC_43M04_EP
+cd CSC_43M04_EP_challenge
 ```
 
 
