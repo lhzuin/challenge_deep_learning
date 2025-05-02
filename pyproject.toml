@@ -1,9 +1,10 @@
 [tool.poetry]
-name = "modal-challenge"
+name = "challenge_deep_learning"
 version = "0.1.0"
 description = ""
 authors = ["lhzuin <luishenriquezuinruiz@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 
 
