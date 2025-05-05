@@ -7,14 +7,19 @@ from tqdm import tqdm
 from utils.sanity import show_images
 
 
-@hydra.main(config_path="configs", config_name="train")
+@hydra.main(config_path="configs", config_name="train", version_base="1.1")
 def train(cfg):
     logger = (
         wandb.init(project="challenge_CSC_43M04_EP", name=cfg.experiment_name)
         if cfg.log
         else None
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
     optimizer = hydra.utils.instantiate(cfg.optim, params=model.parameters())
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)

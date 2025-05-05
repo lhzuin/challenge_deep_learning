@@ -1,3 +1,5 @@
+version_base: 1.1
+
 defaults:
     - _self_
     - dataset: default
@@ -9,6 +11,7 @@ epochs: 20
 log: True
 prefix: ""
 experiment_name: ${prefix}${model.name}_${now:%Y-%m-%d_%H-%M-%S}
+
 
 hydra:
   output_subdir: null
