@@ -1,4 +1,5 @@
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
+import torch
 
 from data.dataset import Dataset
 
@@ -12,6 +13,8 @@ class DataModule:
         batch_size,
         num_workers,
         metadata=["title"],
+        val_ratio: float = 0.1,
+        seed: int = 42
     ):
         self.dataset_path = dataset_path
         self.train_transform = train_transform  
@@ -20,26 +23,44 @@ class DataModule:
         self.num_workers = num_workers
         self.metadata = metadata
 
-    def train_dataloader(self):
-        """Train dataloader."""
-        train_set = Dataset(
+        self.val_ratio = val_ratio
+        self.seed = seed
+
+        # build the two subsets exactly once
+        self._create_split()
+
+    def _create_split(self):
+        full = Dataset(
             self.dataset_path,
             "train_val",
-            transforms=self.train_transform,
+            transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
+
+        val_len = int(self.val_ratio * len(full))
+        train_len = len(full) - val_len
+
+        self.train_set, self.val_set = random_split(
+            full,
+            lengths=[train_len, val_len],
+            generator=torch.Generator().manual_seed(self.seed),
+        )
+
+    def train_dataloader(self):
         return DataLoader(
-            train_set,
+            self.train_set,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
-        """TODO: 
-        Implement a strategy to create a validation set from the train set.
-        """
-        return None
+        return DataLoader(
+            self.val_set,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
     
     def test_dataloader(self):
         """Test dataloader."""
