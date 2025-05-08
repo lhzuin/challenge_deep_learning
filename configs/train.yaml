@@ -4,7 +4,7 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: dinov2
+    - model: siglip
     - loss_fn: msle
 
 epochs: 20

@@ -1,0 +1,3 @@
+_target_: utils.transforms.clip_train
+model_name: ViT-B-16-SigLIP
+pretrained: webli
