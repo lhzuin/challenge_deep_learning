@@ -3,7 +3,7 @@ defaults:
     - train_transform: siglip
 
 batch_size: 128
-num_workers: 16
+num_workers: 14
 metadata: ["title"]
 val_ratio: 0.1
 seed: 42

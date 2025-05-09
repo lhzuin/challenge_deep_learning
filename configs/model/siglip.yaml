@@ -2,7 +2,13 @@ defaults:
   - _self_
 pretrained: webli
 instance:
-  _target_: models.siglip.SigLIPRegressor
+  _target_: models.siglip_unfrozen.SigLIPRegressor
   frozen: True
+
+  # progressive-unfreeze parameters
+  unfreeze_enable: true
+  unfreeze_after_epochs: 10       
+  unfreeze_top_blocks: 2          # unfreeze 2 ↑,2 ↓ blocks
+  unfreeze_proj: true
 
 name: SIGLIP

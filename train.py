@@ -2,6 +2,7 @@ import torch
 import wandb
 import hydra
 from tqdm import tqdm
+from omegaconf import OmegaConf
 
 
 from utils.sanity import show_images
@@ -21,7 +22,21 @@ def train(cfg):
     else:
         device = torch.device("cpu")
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
-    optimizer = hydra.utils.instantiate(cfg.optim, params=model.parameters())
+
+    opt_cfg = OmegaConf.to_container(cfg.optim, resolve=True, enum_to_str=True)
+    # -------------------------------------------------------------------
+    head_lr = opt_cfg.pop("head_lr")
+    body_lr = opt_cfg.pop("body_lr")
+
+    # ------------------------------------------------------------------ #
+    # 2 – build the two parameter groups                                  #
+    # ------------------------------------------------------------------ #
+    param_groups = [
+        {"params": model.head.parameters(),     "lr": head_lr},
+        {"params": model.backbone.parameters(), "lr": body_lr},
+    ]
+
+    optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     train_loader = datamodule.train_dataloader()
@@ -99,6 +114,9 @@ def train(cfg):
                 if logger is not None
                 else None
             )
+        
+        if hasattr(model, "epoch_scheduler_hook"):
+            model.epoch_scheduler_hook() 
 
     print(
         f"""Epoch {epoch}: 

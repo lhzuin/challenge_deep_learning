@@ -1,7 +1,7 @@
 import torch, torch.nn as nn, open_clip
 
 
-class SigLIPRegressor(nn.Module):
+class SigLIPRegressor2(nn.Module):
     def __init__(self, frozen: bool = True):
         super().__init__()
 
