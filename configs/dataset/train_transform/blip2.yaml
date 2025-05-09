@@ -1,0 +1,2 @@
+_target_: utils.transforms.Blip2TensorTransform
+model_name: Salesforce/blip2-opt-2.7b

@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+instance:
+  _target_: models.blip2.BLIP2Regressor
+  frozen: True
+model_name: Salesforce/blip2-opt-2.7b
+name: BLIP2
