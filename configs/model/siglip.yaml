@@ -7,7 +7,7 @@ instance:
 
   # progressive-unfreeze parameters
   unfreeze_enable: true
-  unfreeze_after_epochs: 10       
+  unfreeze_after_epochs: 15       
   unfreeze_top_blocks: 2          # unfreeze 2 ↑,2 ↓ blocks
   unfreeze_proj: true
 

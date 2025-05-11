@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+data_dir: ${root_dir}/dataset/
+root_dir:  ${hydra:runtime.cwd}
+dataset_path: ${data_dir}
+split: train_val
+model_path: models/qwen2-0.5b      # <- local folder with the safetensors/gguf files
+tokenizer_path: ${model_path}      
+batch_size: 16
+cache_dir: ${root_dir}/.local_llm_cache
+hydra:
+  run:
+    dir: .
+  output_subdir: null

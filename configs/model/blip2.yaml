@@ -1,7 +1,11 @@
 defaults:
   - _self_
 instance:
-  _target_: models.blip2.BLIP2Regressor
+  _target_: models.blip2_unfrozen.BLIP2Regressor
   frozen: True
+  # progressive-unfreeze parameters
+  unfreeze_enable: true
+  unfreeze_after_epochs: 15       
+  unfreeze_top_blocks: 2          # unfreeze 2 ↑,2 ↓ blocks
 model_name: Salesforce/blip2-opt-2.7b
 name: BLIP2

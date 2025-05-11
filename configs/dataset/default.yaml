@@ -1,9 +1,9 @@
 defaults:
-    - val_transform: siglip
-    - train_transform: siglip
+    - val_transform: blip2
+    - train_transform: blip2
 
-batch_size: 128
-num_workers: 14
-metadata: ["title"]
+batch_size: 32 #128
+num_workers: 2 #14
+metadata: ["title", "year"]
 val_ratio: 0.1
 seed: 42

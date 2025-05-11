@@ -11,7 +11,13 @@ class Dataset(torch.utils.data.Dataset):
         print(f"{dataset_path}/{split}.csv")
         info = pd.read_csv(f"{dataset_path}/{split}.csv")
         info["description"] = info["description"].fillna("")
-        info["meta"] = info[metadata].agg(" + ".join, axis=1)
+        #info["meta"] = info[metadata].astype(str, copy=True).agg(" + ".join, axis=1)
+        info["meta"] = (
+            info[metadata]
+                .fillna("")
+                .astype("string")
+                .agg(lambda r: " + ".join(v for v in r if v), axis=1)
+        )
         if "views" in info.columns:
             self.targets = info["views"].values
 

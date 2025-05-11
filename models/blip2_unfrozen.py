@@ -2,15 +2,14 @@ import torch, torch.nn as nn
 from transformers import Blip2Model, Blip2Processor
 
 
-class BLIP2Regressor2(nn.Module):
+class BLIP2Regressor(nn.Module):
     def __init__(
         self,
         model_name: str = "Salesforce/blip2-opt-2.7b",
         frozen: bool = True,
         unfreeze_enable: bool = False,
         unfreeze_after_epochs: int | None = None,   # e.g. 3
-        unfreeze_after_steps:  int | None = None,   # alternative
-        unfreeze_top_layers:   int = 4,
+        unfreeze_top_blocks:   int = 4,
     ):
         super().__init__()
 
@@ -27,14 +26,13 @@ class BLIP2Regressor2(nn.Module):
             self.backbone.qformer.requires_grad_(False)
 
         hidden = self.backbone.config.qformer_config.hidden_size
-        self.reg_head = nn.Sequential(nn.LayerNorm(hidden), nn.Linear(hidden, 1))
+        self.head = nn.Sequential(nn.LayerNorm(hidden), nn.Linear(hidden, 1))
 
         # ▸ progressive-unfreeze bookkeeping
         self._unfreeze_cfg = {
             "enable": unfreeze_enable,
             "after_epochs": unfreeze_after_epochs,
-            "after_steps":  unfreeze_after_steps,
-            "top_layers":   unfreeze_top_layers,
+            "top_layers":   unfreeze_top_blocks,
         }
         self._global_step = 0
         self._current_epoch = 0
@@ -43,10 +41,6 @@ class BLIP2Regressor2(nn.Module):
     # ------------------------------------------------------------------ #
     # public helpers (called *implicitly* from train.py — no edit needed) #
     # ------------------------------------------------------------------ #
-    def step_scheduler_hook(self, batch_size):
-        """Call this at the end of every optimizer.step() (see below)."""
-        self._global_step += 1
-        self._maybe_unfreeze()
 
     def epoch_scheduler_hook(self):
         """Call this once per epoch."""
@@ -64,11 +58,8 @@ class BLIP2Regressor2(nn.Module):
             self._unfreeze_cfg["after_epochs"] is not None
             and self._current_epoch >= self._unfreeze_cfg["after_epochs"]
         )
-        step_cond = (
-            self._unfreeze_cfg["after_steps"] is not None
-            and self._global_step  >= self._unfreeze_cfg["after_steps"]
-        )
-        if epoch_cond or step_cond:
+
+        if epoch_cond:
             self._unfreeze_top_qformer_layers(self._unfreeze_cfg["top_layers"])
             self._did_unfreeze = True
             print(f"[BLIP-2] ✔ Unfroze top {self._unfreeze_cfg['top_layers']} Q-Former layers")
@@ -95,5 +86,15 @@ class BLIP2Regressor2(nn.Module):
             attention_mask=txt.attention_mask,
             output_hidden_states=True,
         )
-        pooled_q = out.q_hidden_states.mean(dim=1)
-        return self.reg_head(pooled_q).squeeze(1)
+
+        # ---- robust pooling for every transformers version ----
+        if getattr(out, "qformer_outputs", None) is not None:     # ≥ 4.38
+            q_last = out.qformer_outputs.last_hidden_state        # (B, Nq, Hd)
+        elif getattr(out, "q_hidden_states", None) is not None:   # ≤ 4.36
+            q_last = out.q_hidden_states[-1]                      # list → tensor
+        else:                                                     # future proof
+            raise RuntimeError("Cannot locate Q-Former hidden states in output")
+
+        pooled_q = q_last.mean(dim=1)                             # (B, Hd)
+
+        return self.head(pooled_q).squeeze(1)
