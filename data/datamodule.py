@@ -32,7 +32,7 @@ class DataModule:
     def _create_split(self):
         full = Dataset(
             self.dataset_path,
-            "train_val",
+            "train_val_gpt",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
@@ -66,7 +66,7 @@ class DataModule:
         """Test dataloader."""
         dataset = Dataset(
             self.dataset_path,
-            "test",
+            "test_gpt",
             transforms=self.test_transform,
             metadata=self.metadata,
         )

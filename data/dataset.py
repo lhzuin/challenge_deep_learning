@@ -10,7 +10,10 @@ class Dataset(torch.utils.data.Dataset):
         # - read the info csvs
         print(f"{dataset_path}/{split}.csv")
         info = pd.read_csv(f"{dataset_path}/{split}.csv")
-        info["description"] = info["description"].fillna("")
+        if "description" in info.columns:
+            info["description"] = info["description"].fillna("")
+        if "summary" in info.columns:
+            info["summary"] = info["summary"].fillna("")
         #info["meta"] = info[metadata].astype(str, copy=True).agg(" + ".join, axis=1)
         info["meta"] = (
             info[metadata]

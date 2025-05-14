@@ -12,7 +12,7 @@ def create_submission(cfg):
     test_loader = DataLoader(
         Dataset(
             cfg.datamodule.dataset_path,
-            "test",
+            "test_gpt",
             transforms=hydra.utils.instantiate(cfg.datamodule.test_transform),
             metadata=cfg.datamodule.metadata,
         ),
