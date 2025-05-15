@@ -3,6 +3,7 @@ import wandb
 import hydra
 from tqdm import tqdm
 from omegaconf import OmegaConf
+from transformers import get_cosine_schedule_with_warmup
 
 
 from utils.sanity import show_images
@@ -21,6 +22,7 @@ def train(cfg):
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
+    
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
 
     opt_cfg = OmegaConf.to_container(cfg.optim, resolve=True, enum_to_str=True)
@@ -29,7 +31,7 @@ def train(cfg):
     body_lr = opt_cfg.pop("body_lr")
 
     # ------------------------------------------------------------------ #
-    # 2 – build the two parameter groups                                  #
+    # Build the two parameter groups                                  #
     # ------------------------------------------------------------------ #
     head_params = list(model.head.parameters())
     if hasattr(model, "year_proj"):
@@ -41,6 +43,25 @@ def train(cfg):
     ]
 
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
+    # ── dataloaders ────────────────────────────────────────────
+    datamodule = hydra.utils.instantiate(cfg.datamodule)
+    train_loader = datamodule.train_dataloader()
+    val_loader   = datamodule.val_dataloader()
+
+    # ── cosine-with-warmup scheduler ───────────────────────────
+    if cfg.use_warmup:
+        num_epochs      = cfg.epochs
+        num_batches     = len(train_loader)
+        total_steps     = num_epochs * num_batches
+        num_warmup_steps = int(total_steps * cfg.warmup_fraction)
+
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=total_steps,
+        )
+
+
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     train_loader = datamodule.train_dataloader()
@@ -77,20 +98,24 @@ def train(cfg):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if cfg.use_warmup:
+                scheduler.step()
+                if logger is not None:
+                    lrs = scheduler.get_last_lr()
+                    logger.log({"lr_head": lrs[0], "lr_body": lrs[1]})
             epoch_train_loss += loss.detach().cpu().numpy() * len(batch["image"])
             num_samples_train += len(batch["image"])
             pbar.set_postfix({"train/loss_step": loss.detach().cpu().numpy()})
         epoch_train_loss /= num_samples_train
-        (
+
+        if logger is not None:
             logger.log(
                 {
                     "epoch": epoch,
                     "train/loss_epoch": epoch_train_loss,
                 }
             )
-            if logger is not None
-            else None
-        )
+
 
         # -- validation loop
         val_metrics = {}

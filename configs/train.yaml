@@ -7,7 +7,10 @@ defaults:
     - model: siglip
     - loss_fn: msle
 
-epochs: 50
+epochs: 100
+use_warmup: true
+warmup_fraction: 0.05
+unfreeze_fraction: 0.1
 log: True
 prefix: ""
 experiment_name: ${prefix}${model.name}_${now:%Y-%m-%d_%H-%M-%S}

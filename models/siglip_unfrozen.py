@@ -9,7 +9,8 @@ class SigLIPRegressor(nn.Module):
         frozen=True,
         # ───── progressive-unfreeze knobs (YAML-controllable) ─────
         unfreeze_enable=False,
-        unfreeze_after_epochs=None,      # e.g. 3
+        unfreeze_epoch_fraction=None,      # e.g. 3
+        total_epochs=None,
         unfreeze_top_blocks=2,           # how many ViT / text blocks
         unfreeze_proj=True,              # also turn on .proj/.text_projection
 
@@ -19,6 +20,11 @@ class SigLIPRegressor(nn.Module):
 
         super().__init__()
         self.add_year_proj = add_year_proj
+        self.unfreeze_unable = unfreeze_enable
+        if unfreeze_enable:
+            unfreeze_after_epochs = int(total_epochs*unfreeze_epoch_fraction)
+        else:
+            unfreeze_after_epochs = None
 
         # backbone -----------------------------------------------------------
         self.backbone, self.pre_tf, self.val_tf = open_clip.create_model_and_transforms(
@@ -59,7 +65,8 @@ class SigLIPRegressor(nn.Module):
 
     def epoch_scheduler_hook(self):
         self._epoch += 1
-        self._maybe_unfreeze()
+        if self.unfreeze_unable:
+            self._maybe_unfreeze()
 
     # ------------------------------------------------------------------ #
     # forward                                                            #
