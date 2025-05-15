@@ -11,4 +11,7 @@ instance:
   unfreeze_top_blocks: 2          # unfreeze 2 ↑,2 ↓ blocks
   unfreeze_proj: true
 
+  add_year_proj: true
+  year_proj_dim: 8
+
 name: SIGLIP

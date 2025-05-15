@@ -1,10 +1,13 @@
 import torch
 import pandas as pd
 from PIL import Image
+import numpy as np
 
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path, split, transforms, metadata):
+        self.mu = 2016.78
+        self.sigma = 4.04
         self.dataset_path = dataset_path
         self.split = split
         # - read the info csvs
@@ -12,9 +15,14 @@ class Dataset(torch.utils.data.Dataset):
         info = pd.read_csv(f"{dataset_path}/{split}.csv")
         if "description" in info.columns:
             info["description"] = info["description"].fillna("")
+        
         if "summary" in info.columns:
             info["summary"] = info["summary"].fillna("")
-        #info["meta"] = info[metadata].astype(str, copy=True).agg(" + ".join, axis=1)
+        
+        if "year_z" in metadata:
+            metadata.remove("year_z")
+            self.years = info["year"].astype(int).values
+
         info["meta"] = (
             info[metadata]
                 .fillna("")
@@ -46,6 +54,12 @@ class Dataset(torch.utils.data.Dataset):
             "image": image,
             "text": self.text[idx],
         }
+
+        if hasattr(self, "years"):
+            z = (self.years[idx] - self.mu) / self.sigma
+            z_clipped = np.clip(z, -3.0, 3.0)
+            value["year_z"] = torch.tensor([z_clipped], dtype=torch.float32)
+        
         # - don't have the target for test
         if hasattr(self, "targets"):
             value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)

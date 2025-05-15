@@ -12,14 +12,27 @@ class SigLIPRegressor(nn.Module):
         unfreeze_after_epochs=None,      # e.g. 3
         unfreeze_top_blocks=2,           # how many ViT / text blocks
         unfreeze_proj=True,              # also turn on .proj/.text_projection
+
+        add_year_proj = True,
+        year_proj_dim = 8
         ):
+
         super().__init__()
+        self.add_year_proj = add_year_proj
 
         # backbone -----------------------------------------------------------
         self.backbone, self.pre_tf, self.val_tf = open_clip.create_model_and_transforms(
             model_name, pretrained=pretrained
         )
         self.tokenizer = open_clip.get_tokenizer(model_name)
+
+        # Add year projection MLP
+        if self.add_year_proj:
+            self.year_proj = nn.Sequential(
+                nn.Linear(1, year_proj_dim),
+                nn.ReLU(),
+                nn.LayerNorm(year_proj_dim),
+            )
 
         # freeze all ----------------------------------------------------------
         if frozen:
@@ -29,7 +42,8 @@ class SigLIPRegressor(nn.Module):
 
         # reg-head -----------------------------------------------------------
         D = self._joint_dim()
-        self.head = nn.Sequential(nn.LayerNorm(2 * D), nn.Linear(2 * D, 1))
+        joint_dim = 2 * D + year_proj_dim if self.add_year_proj else 2*D
+        self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Linear(joint_dim, 1))
 
         # scheduler bookkeeping ---------------------------------------------
         self._cfg = dict(enable=unfreeze_enable, T=unfreeze_top_blocks,
@@ -55,7 +69,13 @@ class SigLIPRegressor(nn.Module):
         txt_f = self.backbone.encode_text(
             self.tokenizer(batch["text"]).to(img_f.device)
         )
-        return self.head(torch.cat([img_f, txt_f], dim=-1)).squeeze(1)
+        if self.add_year_proj:
+            yr_z = batch["year_z"].to(img_f.device)       # [B,1]
+            yr_f = self.year_proj(yr_z) 
+            joint = torch.cat([img_f, txt_f, yr_f], dim=-1)
+        else:
+            joint = torch.cat([img_f, txt_f], dim=-1)
+        return self.head(joint).squeeze(1)
 
     # ------------------------------------------------------------------ #
     # internals                                                          #

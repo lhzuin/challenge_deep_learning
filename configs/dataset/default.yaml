@@ -4,6 +4,6 @@ defaults:
 
 batch_size: 128
 num_workers: 14
-metadata: ["title", "year", "summary"]
+metadata: ["title", "year_z", "summary"]
 val_ratio: 0.1
 seed: 42

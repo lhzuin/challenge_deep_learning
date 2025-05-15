@@ -31,8 +31,12 @@ def train(cfg):
     # ------------------------------------------------------------------ #
     # 2 – build the two parameter groups                                  #
     # ------------------------------------------------------------------ #
+    head_params = list(model.head.parameters())
+    if hasattr(model, "year_proj"):
+        head_params += list(model.year_proj.parameters())
+    
     param_groups = [
-        {"params": model.head.parameters(),     "lr": head_lr},
+        {"params": head_params,     "lr": head_lr},
         {"params": model.backbone.parameters(), "lr": body_lr},
     ]
 
