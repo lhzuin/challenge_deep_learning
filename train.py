@@ -7,6 +7,9 @@ from transformers import get_cosine_schedule_with_warmup
 
 
 from utils.sanity import show_images
+import signal, sys
+import os
+
 
 
 @hydra.main(config_path="configs", config_name="train", version_base="1.1")
@@ -23,10 +26,23 @@ def train(cfg):
     else:
         device = torch.device("cpu")
     
+    print(f"🏃‍♂️ Training process PID = {os.getpid()}")
+
+    # Instantiate model and loss
+    loss_fn = hydra.utils.instantiate(cfg.loss_fn)
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
+    
+    # Configuring Early Stop
+    def save_and_exit(*_):
+        torch.save(model.state_dict(), cfg.checkpoint_path)
+        print("🔖 checkpoint written to cfg.checkpoint_path")
+        sys.exit(0)
+
+    signal.signal(signal.SIGUSR1, save_and_exit)
+    # -------------------------------------------------------------------
 
     opt_cfg = OmegaConf.to_container(cfg.optim, resolve=True, enum_to_str=True)
-    # -------------------------------------------------------------------
+    
     head_lr = opt_cfg.pop("head_lr")
     body_lr = opt_cfg.pop("body_lr")
 
@@ -34,8 +50,10 @@ def train(cfg):
     # Build the two parameter groups                                  #
     # ------------------------------------------------------------------ #
     head_params = list(model.head.parameters())
-    if hasattr(model, "year_proj"):
-        head_params += list(model.year_proj.parameters())
+    # always optimize any of these if they exist:
+    for attr in ("year_proj","ch_emb","cy_proj","year_emb","date_proj"):
+        if hasattr(model, attr):
+            head_params += list(getattr(model, attr).parameters())
     
     param_groups = [
         {"params": head_params,     "lr": head_lr},
@@ -62,10 +80,8 @@ def train(cfg):
         )
 
 
-    loss_fn = hydra.utils.instantiate(cfg.loss_fn)
-    datamodule = hydra.utils.instantiate(cfg.datamodule)
-    train_loader = datamodule.train_dataloader()
-    val_loader = datamodule.val_dataloader()
+
+    # -- sanity check
     train_sanity = show_images(train_loader, name="assets/sanity/train_images")
     (
         logger.log({"sanity_checks/train_images": wandb.Image(train_sanity)})

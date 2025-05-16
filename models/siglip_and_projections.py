@@ -13,7 +13,15 @@ class SigLIPRegressor(nn.Module):
         total_epochs=None,
         unfreeze_top_blocks=2,           # how many ViT / text blocks
         unfreeze_proj=True,              # also turn on .proj/.text_projection
+        num_channels: int = 47,
+        num_year_buckets: int = 13, 
+        ch_emb_dim: int = 16,
+        year_proj_dim: int = 8,
+        year_emb_dim: int = 8,
+        date_proj_dim: int = 16,
+        cy_hidden: int = 16,
         ):
+
         super().__init__()
         if unfreeze_enable:
             unfreeze_after_epochs = int(total_epochs*unfreeze_epoch_fraction)
@@ -26,17 +34,55 @@ class SigLIPRegressor(nn.Module):
         )
         self.tokenizer = open_clip.get_tokenizer(model_name)
 
+        # ── continuous year MLP ─────────────────────────────────
+        self.year_proj = nn.Sequential(
+            nn.Linear(1, year_proj_dim),
+            nn.ReLU(),
+            nn.LayerNorm(year_proj_dim),
+        )
+    
+
+        # ── channel×year interaction ────────────────────────────
+
+        self.cy_proj = nn.Sequential(
+            nn.Linear(ch_emb_dim + year_proj_dim, cy_hidden),
+            nn.ReLU(),
+            nn.LayerNorm(cy_hidden),
+        )
+
+        # ── channel embedding ────────────────────────────────────
+        self.ch_emb = nn.Embedding(num_channels, ch_emb_dim)
+        
+        # ── bucketed year embedding ─────────────────────────────
+        self.year_emb  = nn.Embedding(num_year_buckets, year_emb_dim)
+
+        # ── date features MLP ───────────────────────────────────
+        self.date_proj = nn.Sequential(
+            nn.Linear(6, date_proj_dim),
+            nn.ReLU(),
+            nn.LayerNorm(date_proj_dim),
+        )
+
+
+
         # ── regression head ──────────────────────────────────────
         D = self._joint_dim()
-        joint_dim = 2*D
-
+        joint_dim = (
+            2*D             +  # image + text
+            ch_emb_dim      +
+            year_proj_dim   +
+            year_emb_dim    +
+            date_proj_dim   +
+            cy_hidden
+        )
         self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Linear(joint_dim,1))
 
         # freeze all ----------------------------------------------------------
         if frozen:
             self.backbone.visual.requires_grad_(False)
             if hasattr(self.backbone, "text"):
-                self.backbone.text.requires_grad_(False)    
+                self.backbone.text.requires_grad_(False)
+        
 
         # scheduler bookkeeping ---------------------------------------------
         self._cfg = dict(enable=unfreeze_enable, T=unfreeze_top_blocks,
@@ -45,6 +91,10 @@ class SigLIPRegressor(nn.Module):
         self._epoch = 0
         self._step  = 0
         self._done  = False
+
+    # ------------------------------------------------------------------ #
+    # hooks (call these from train.py, exactly like for BLIP-2)          #
+    # ------------------------------------------------------------------ #
 
     def epoch_scheduler_hook(self):
         self._epoch += 1
@@ -60,6 +110,28 @@ class SigLIPRegressor(nn.Module):
         )
 
         joint_f = [img_f, txt_f]
+        yr_norm = batch["year_norm"].to(img_f.device)       # [B,1]
+        yr_f = self.year_proj(yr_norm) 
+        joint_f.append(yr_f)
+
+        # channel embed
+        ch_f = self.ch_emb(batch["channel_idx"].to(img_f.device))
+        joint_f.append(ch_f)
+        
+        # channel×year interaction
+        cy_in = torch.cat([ch_f, yr_f], dim=1)
+        cy_f  = self.cy_proj(cy_in)
+        joint_f.append(cy_f)
+
+        # Year bucket
+        yr_emb_f = self.year_emb(batch["year_idx"].to(img_f.device))   # [B, year_emb_dim]
+        joint_f.append(yr_emb_f)
+        
+        # 3) date flags
+        date = torch.cat([batch[k].to(img_f.device) for k in
+            ["m_sin","m_cos","d_sin","d_cos","h_sin","h_cos"]], dim=1)
+        date_f = self.date_proj(date)
+        joint_f.append(date_f)
         joint = torch.cat(joint_f, dim=-1)
         return self.head(joint).squeeze(1)
 

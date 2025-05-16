@@ -1,5 +1,5 @@
 _target_: torch.optim.AdamW
-head_lr: 2e-3       # rapide
+head_lr: 4e-3       # rapide
 body_lr: 2e-5        # lent
 weight_decay: 0.01
 betas: [0.9, 0.999]
