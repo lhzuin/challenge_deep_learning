@@ -49,44 +49,17 @@ def train(cfg):
     # ------------------------------------------------------------------ #
     # Build the two parameter groups                                  #
     # ------------------------------------------------------------------ #
-    param_groups = []
-    decay = cfg.layer_decay
-    num_blocks = len(model.img_encoder.visual.trunk.blocks)
-    # collect all transformer blocks, assign lr = body_lr * decay**(depth)
-    for depth, module in enumerate(model.img_encoder.visual.trunk.blocks):
-        
-        param_groups.append({
-        "params": module.parameters(),
-        "lr": body_lr * (decay ** (num_blocks - depth - 1))
-        })
-
-
-    text_blocks = model.text_encoder.transformer.layer  # or .resblocks, depending on your model
-    num_text_blocks = len(text_blocks)
-    for depth, module in enumerate(text_blocks):
-        layer_lr = body_lr * (decay ** (num_text_blocks - depth - 1))
-        param_groups.append({
-            "params": module.parameters(),
-            "lr": layer_lr,
-        })
-    # --- collect LoRA adapter parameters at head_lr ---
-    adapter_params = []
-    for name, param in model.named_parameters():
-        if param.requires_grad and "lora_" in name:
-            adapter_params.append(param)
-
-    param_groups.append({
-        "params": adapter_params,
-        "lr": head_lr,
-    })
-    
     head_params = list(model.head.parameters())
     # always optimize any of these if they exist:
     for attr in ("year_proj","ch_emb","cy_proj","year_emb","date_proj"):
         if hasattr(model, attr):
             head_params += list(getattr(model, attr).parameters())
     
-    param_groups.append({"params": head_params,     "lr": head_lr})
+    param_groups = [
+        {"params": head_params,     "lr": head_lr},
+        {"params": model.backbone.parameters(), "lr": body_lr},
+    ]
+
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     datamodule = hydra.utils.instantiate(cfg.datamodule)

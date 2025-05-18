@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+pretrained: webli
+instance:
+  _target_: models.siglip_distilbert_lora.SigLIPDistilBert
+  num_channels: 47
+  num_year_buckets: 13  # (max_year-min_year+1)
+  ch_emb_dim: 16
+  year_proj_dim: 8
+  year_emb_dim: 8
+  date_proj_dim: 16
+  cy_hidden: 16
+
+name: SIGLIP_DISTILBERT_LORA

@@ -75,7 +75,15 @@ class SigLIPRegressor(nn.Module):
             date_proj_dim   +
             cy_hidden
         )
-        self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Dropout(p=0.1), nn.Linear(joint_dim,1))
+        self.head = nn.Sequential(
+            nn.LayerNorm(joint_dim),
+            nn.Dropout(p=0.1),
+            nn.Linear(joint_dim, 512),
+            nn.ReLU(),
+            nn.LayerNorm(512),
+            nn.Dropout(p=0.1),
+            nn.Linear(512, 1),
+        )
 
         # freeze all ----------------------------------------------------------
         if frozen:

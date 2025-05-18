@@ -4,13 +4,14 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: siglip
+    - model: siglip_distilbert_lora
     - loss_fn: msle
 
 epochs: 90
 use_warmup: true
 warmup_fraction: 0.02
 unfreeze_fraction: 0.15
+layer_decay: 0.8
 log: True
 prefix: ""
 experiment_name: ${prefix}${model.name}_${now:%Y-%m-%d_%H-%M-%S}

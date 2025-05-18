@@ -29,18 +29,6 @@ class Dataset(torch.utils.data.Dataset):
         self.has_year_idx = False
         self.has_date_sin = False
         self.has_channel_idx = False
-        self.has_title = False
-        self.has_summary = False
-
-        if "summary" in metadata:
-            self.has_summary = True
-            metadata.remove("summary")
-            self.summary = info["summary"].astype("string")
-
-        if "title" in metadata:
-            self.has_title = True
-            metadata.remove("title")
-            self.title = info["title"].astype("string")
 
         if "year_z" in metadata:
             self.has_year_z = True
@@ -108,12 +96,6 @@ class Dataset(torch.utils.data.Dataset):
             "image": image,
             "text": self.text[idx],
         }
-
-        if self.has_title:
-            value["title"] = self.title[idx]
-        
-        if self.has_summary:
-            value["summary"] = self.summary[idx]
 
         # 0) year_z 
         if self.has_year_z:
