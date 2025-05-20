@@ -7,7 +7,9 @@ class SigLIPDistilBert(nn.Module):
     def __init__(
         self,
         num_channels: int = 47,
-        num_year_buckets: int = 13, 
+        num_year_buckets: int = 13,
+        head_hidden_dim: int = 256,
+        head_dropout: float = 0.15,
         ch_emb_dim: int = 16,
         year_proj_dim: int = 8,
         year_emb_dim: int = 8,
@@ -21,14 +23,6 @@ class SigLIPDistilBert(nn.Module):
         pretrained="webli"
 
         distilbert_name = "distilbert-base-uncased"
-        lora_cfg = LoraConfig(
-            r=8,
-            lora_alpha=16,
-            target_modules=["q_proj","v_proj"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type="FEATURE_EXTRACTION"
-        )
         
         # image tower -----------------------------------------------------------
         self.img_encoder, self.pre_tf, self.val_tf = open_clip.create_model_and_transforms(
@@ -37,7 +31,7 @@ class SigLIPDistilBert(nn.Module):
 
         vision_lora_cfg = LoraConfig(
             r=8,
-            lora_alpha=16,           # renamed from alpha
+            lora_alpha=16,          
             target_modules=["qkv"],  # this covers the fused qkv projection
             lora_dropout=0.05,       # renamed from dropout
             bias="none",
@@ -84,18 +78,18 @@ class SigLIPDistilBert(nn.Module):
     
 
         # ── channel×year interaction ────────────────────────────
-
+        
         self.cy_proj = nn.Sequential(
             nn.Linear(ch_emb_dim + year_proj_dim, cy_hidden),
             nn.ReLU(),
             nn.LayerNorm(cy_hidden),
         )
-
+        
         # ── channel embedding ────────────────────────────────────
         self.ch_emb = nn.Embedding(num_channels, ch_emb_dim)
         
         # ── bucketed year embedding ─────────────────────────────
-        self.year_emb  = nn.Embedding(num_year_buckets, year_emb_dim)
+        #self.year_emb  = nn.Embedding(num_year_buckets, year_emb_dim)
 
         # ── date features MLP ───────────────────────────────────
         self.date_proj = nn.Sequential(
@@ -110,18 +104,18 @@ class SigLIPDistilBert(nn.Module):
             3*D             +  # image + text
             ch_emb_dim      +
             year_proj_dim   +
-            year_emb_dim    +
+            #year_emb_dim    +
             date_proj_dim   +
             cy_hidden
         )
         #self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Dropout(p=0.1), nn.Linear(joint_dim,1))
         self.head = nn.Sequential(
             nn.LayerNorm(joint_dim),
-            nn.Dropout(0.15),
-            nn.Linear(joint_dim,256),
+            nn.Dropout(head_dropout),
+            nn.Linear(joint_dim,head_hidden_dim),
             nn.ReLU(),
-            nn.Dropout(0.15),
-            nn.Linear(256,1),
+            nn.Dropout(head_dropout),
+            nn.Linear(head_hidden_dim,1),
         )
 
     # ------------------------------------------------------------------ #
@@ -158,8 +152,8 @@ class SigLIPDistilBert(nn.Module):
         joint_f.append(cy_f)
 
         # Year bucket
-        yr_emb_f = self.year_emb(batch["year_idx"].to(img_f.device))   # [B, year_emb_dim]
-        joint_f.append(yr_emb_f)
+        #yr_emb_f = self.year_emb(batch["year_idx"].to(img_f.device))   # [B, year_emb_dim]
+        #joint_f.append(yr_emb_f)
         
         # 3) date flags
         date = torch.cat([batch[k].to(img_f.device) for k in

@@ -10,12 +10,13 @@ class Dataset(torch.utils.data.Dataset):
         self.mu = 2016.78
         self.sigma = 4.04
         self.min_year = 2011
-        self.max_year = 2023
+        self.max_year = 2025#2023
         self.dataset_path = dataset_path
         self.split = split
         # - read the info csvs
         print(f"{dataset_path}/{split}.csv")
         info = pd.read_csv(f"{dataset_path}/{split}.csv")
+        self.info = info
         
         if "description" in info.columns:
             info["description"] = info["description"].fillna("")

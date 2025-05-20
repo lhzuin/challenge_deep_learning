@@ -18,7 +18,7 @@ data:
 
 data_dir: ${root_dir}/dataset/
 prefix: ""
-time_stamp: 2025-05-18_19-01-15
+time_stamp: 2025-05-19_19-03-05
 experiment_name: ${prefix}${model.name}_${time_stamp}
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt

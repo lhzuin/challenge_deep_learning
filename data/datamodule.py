@@ -1,5 +1,6 @@
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 import torch
+import numpy as np
 
 from data.dataset import Dataset
 
@@ -27,6 +28,7 @@ class DataModule:
         self.seed = seed
 
         # build the two subsets exactly once
+        #self._create_split_newest()
         self._create_split()
 
     def _create_split(self):
@@ -45,6 +47,23 @@ class DataModule:
             lengths=[train_len, val_len],
             generator=torch.Generator().manual_seed(self.seed),
         )
+
+    def _create_split_newest(self):
+        full = Dataset(
+            self.dataset_path,
+            "train_val_gpt",
+            transforms=self.test_transform,   # no augmentations for the split
+            metadata=self.metadata,
+        )
+
+        years = full.info["year"].values
+        newest_idx = np.where(years >= 2022)[0].tolist()
+        old_idx    = np.where(years <  2022)[0].tolist()
+
+        # 3) wrap with Subset
+        self.train_set = Subset(full, old_idx)
+        self.val_set   = Subset(full, newest_idx)
+
 
     def train_dataloader(self):
         return DataLoader(

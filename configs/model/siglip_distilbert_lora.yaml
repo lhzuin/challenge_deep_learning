@@ -5,6 +5,8 @@ instance:
   _target_: models.siglip_distilbert_lora.SigLIPDistilBert
   num_channels: 47
   num_year_buckets: 13  # (max_year-min_year+1)
+  head_hidden_dim: 256
+  head_dropout: 0.15
   ch_emb_dim: 16
   year_proj_dim: 8
   year_emb_dim: 8
