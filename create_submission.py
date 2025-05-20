@@ -6,19 +6,19 @@ import torch
 from data.dataset import Dataset
 
 
-@hydra.main(config_path="configs", config_name="train")
+@hydra.main(config_path="configs", config_name="submission")
 def create_submission(cfg):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     test_loader = DataLoader(
         Dataset(
-            cfg.datamodule.dataset_path,
+            cfg.data.dataset_path,
             "test_gpt",
-            transforms=hydra.utils.instantiate(cfg.datamodule.test_transform),
-            metadata=cfg.datamodule.metadata,
+            transforms=hydra.utils.instantiate(cfg.data.test_transform),
+            metadata=cfg.data.metadata,
         ),
-        batch_size=cfg.datamodule.batch_size,
+        batch_size=cfg.data.batch_size,
         shuffle=False,
-        num_workers=cfg.datamodule.num_workers,
+        num_workers=cfg.data.num_workers,
     )
     # - Load model and checkpoint
     model = hydra.utils.instantiate(cfg.model.instance).to(device)

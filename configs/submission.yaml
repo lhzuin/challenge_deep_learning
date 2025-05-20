@@ -1,20 +1,7 @@
-version_base: 1.1
-
 defaults:
     - _self_
     - dataset: default
-    - optim: adamw
     - model: siglip_distilbert_lora
-    - loss_fn: msle
-
-epochs: 40 #50 / 35
-use_warmup: true
-warmup_fraction: 0.02
-unfreeze_fraction: 0.15
-layer_decay: 0.8
-log: True
-prefix: ""
-experiment_name: ${prefix}${model.name}_${now:%Y-%m-%d_%H-%M-%S}
 
 
 hydra:
@@ -22,18 +9,19 @@ hydra:
   run:
     dir: .
 
-datamodule:
-  _target_: data.datamodule.DataModule
+data:
   dataset_path: ${data_dir}
-  train_transform: ${dataset.train_transform}
   test_transform: ${dataset.val_transform}
   batch_size: ${dataset.batch_size}
   num_workers: ${dataset.num_workers}
   metadata: ${dataset.metadata}
 
 data_dir: ${root_dir}/dataset/
+prefix: ""
+time_stamp: 2025-05-19_19-03-05
+experiment_name: ${prefix}${model.name}_${time_stamp}
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
-
-
+unfreeze_fraction: 0.15
+epochs: 90
 
