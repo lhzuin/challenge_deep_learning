@@ -3,6 +3,7 @@ import json
 import pandas as pd
 from PIL import Image
 import numpy as np
+import math
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -87,6 +88,7 @@ class Dataset(torch.utils.data.Dataset):
         if "views" in info.columns:
             self.targets = info["views"].values
 
+
         # - ids
         self.ids = info["id"].values
         # - text
@@ -155,5 +157,8 @@ class Dataset(torch.utils.data.Dataset):
         
         # - don't have the target for test
         if hasattr(self, "targets"):
-            value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
+            y = float(self.targets[idx])
+            value["target"] = torch.tensor(math.log1p(y), dtype=torch.float32)
+        #if hasattr(self, "targets"):
+        #value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
         return value

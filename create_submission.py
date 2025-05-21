@@ -2,6 +2,7 @@ import hydra
 from torch.utils.data import DataLoader
 import pandas as pd
 import torch
+import numpy as np
 
 from data.dataset import Dataset
 
@@ -34,10 +35,12 @@ def create_submission(cfg):
         batch["image"] = batch["image"].to(device)
         with torch.no_grad():
             preds = model(batch).squeeze().cpu().numpy()
+        views = np.expm1(preds)       # exp(pred) – 1
+        views = np.clip(views, 0, None)
         submission = pd.concat(
             [
                 submission,
-                pd.DataFrame({"ID": batch["id"], "views": preds}),
+                pd.DataFrame({"ID": batch["id"], "views": views}),
             ]
         )
     submission.to_csv(f"{cfg.root_dir}/submission.csv", index=False)

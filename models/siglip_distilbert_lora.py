@@ -115,7 +115,8 @@ class SigLIPDistilBert(nn.Module):
             nn.Linear(joint_dim,head_hidden_dim),
             nn.ReLU(),
             nn.Dropout(head_dropout),
-            nn.Linear(head_hidden_dim,1),
+            nn.Linear(head_hidden_dim, 1),  
+            #nn.Softplus()
         )
 
     # ------------------------------------------------------------------ #
