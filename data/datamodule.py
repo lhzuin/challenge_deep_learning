@@ -34,7 +34,7 @@ class DataModule:
     def _create_split(self):
         full = Dataset(
             self.dataset_path,
-            "train_val_gpt",
+            "train_val_gpt_aug",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
@@ -51,7 +51,7 @@ class DataModule:
     def _create_split_newest(self):
         full = Dataset(
             self.dataset_path,
-            "train_val_gpt",
+            "train_val_gpt_aug",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
