@@ -116,7 +116,6 @@ class SigLIPDistilBert(nn.Module):
     # ------------------------------------------------------------------ #
     def forward(self, batch):
         img_f = self.img_encoder.encode_image(batch["image"])
-        img_f = self.img_proj(img_f)
 
         tok_title = self.tokenizer(batch["title"], padding=True, truncation=True, max_length=64, return_tensors="pt").to(img_f.device)
         tok_title = {k:v.to(img_f.device) for k,v in tok_title.items()}
