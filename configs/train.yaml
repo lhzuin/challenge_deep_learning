@@ -4,10 +4,10 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: siglip_distilbert_lora
+    - model: dinov2_distilbert_lora
     - loss_fn: msle
 
-epochs: 40 #50 / 35
+epochs: 30 #50 / 35
 use_warmup: true
 warmup_fraction: 0.02
 unfreeze_fraction: 0.15

@@ -28,8 +28,8 @@ class DataModule:
         self.seed = seed
 
         # build the two subsets exactly once
-        #self._create_split_newest()
-        self._create_split()
+        self._create_split_newest()
+        #self._create_split()
 
     def _create_split(self):
         full = Dataset(
