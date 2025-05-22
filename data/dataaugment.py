@@ -6,8 +6,8 @@ import shutil
 from tqdm import tqdm
 
 input_images_dir = "dataset/train_val_gpt"  # dossier contenant les images d'origine
-output_images_dir = "dataset/train_val_gpt_aug"  # dossier de sortie pour les images augmentées
-descriptions_csv = "dataset/train_val_gpt.csv"  # fichier CSV : image,description
+output_images_dir = "dataset/train_val_gpt_aug7"  # dossier de sortie pour les images augmentées
+descriptions_csv = "dataset/train_val_gpt7.csv"  # fichier CSV : image,description
 output_csv = "dataset"  # dossier de sortie pour le CSV
 
 os.makedirs(output_images_dir, exist_ok=True)
@@ -37,8 +37,8 @@ def perturb_image(img):
         pixels[x, y] = tuple(random.randint(0, 255) for _ in range(3))
     return img
 
-n_augmentations = 3
-output_csv = os.path.join(output_csv, "train_val_gpt_aug.csv")
+n_augmentations = 7# nombre d'augmentations par image
+output_csv = os.path.join(output_csv, "train_val_gpt_aug7.csv")
 
 with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
     fieldnames = ['Unnamed: 0', 'id', 'channel', 'title', 'date', 'views', 'year', 'summary']
@@ -56,7 +56,7 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
         writer.writerow(descriptions[id])
         img = Image.open(img_path).convert("RGB")
 
-        for i in tqdm(range(n_augmentations), desc=f"Aug {filename}", leave=False):
+        for i in range(n_augmentations):
             img_aug = perturb_image(img)
             new_name = f"{id}_aug{i+1}.jpg"
             new_path = os.path.join(output_images_dir, new_name)
