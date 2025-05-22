@@ -1,18 +1,18 @@
 import torch, torch.nn as nn, open_clip
 import transformers
 from peft import get_peft_model, LoraConfig
+# Cross-modal fusion layers
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 
 class SigLIPDistilBert(nn.Module):
     def __init__(
         self,
         num_channels: int = 47,
-        num_year_buckets: int = 13,
         head_hidden_dim: int = 256,
         head_dropout: float = 0.15,
         ch_emb_dim: int = 16,
         year_proj_dim: int = 8,
-        year_emb_dim: int = 8,
         date_proj_dim: int = 16,
         cy_hidden: int = 16,
         ):
@@ -62,7 +62,12 @@ class SigLIPDistilBert(nn.Module):
             p.requires_grad = False
         bert_dim = self.text_encoder.config.hidden_size
 
+        D = min(clip_dim, bert_dim)
 
+        self.title_proj   = nn.Linear(bert_dim, D)
+        self.sum_proj     = nn.Linear(bert_dim, D)   
+        
+        self.img_proj     = nn.Linear(clip_dim, D)
 
         # ── continuous year MLP ─────────────────────────────────
         self.year_proj = nn.Sequential(
@@ -91,24 +96,34 @@ class SigLIPDistilBert(nn.Module):
             nn.LayerNorm(date_proj_dim),
         )
 
-
-        # ── regression head ──────────────────────────────────────
-        joint_dim = (
-            2*bert_dim      +
-            clip_dim        +
-            ch_emb_dim      +
-            year_proj_dim   +
-            date_proj_dim   +
-            cy_hidden
+        # ── Cross-modal fusion Transformer ──────────────────────
+        # We have three “tokens” (img, summary, title). We'll reshape them into a sequence.
+        fusion_dim = D  # same dimension for all modality embeddings
+        
+        encoder_layer = TransformerEncoderLayer(
+            d_model=fusion_dim,
+            nhead=4,           # 4 attention heads
+            dim_feedforward= fusion_dim * 2,
+            dropout=0.4,
+            activation="relu",
+            batch_first=True 
         )
-
+        self.fusion_transformer = TransformerEncoder(
+            encoder_layer,
+            num_layers=2       # two-layer fusion
+        )
+    
+        # ── regression head (unchanged dims except now head sees one token instead of concat)
+        # We'll pool (mean) the transformer outputs over the 3 tokens, then send through head.
+        meta_dim = year_proj_dim + ch_emb_dim + cy_hidden + date_proj_dim
+        joint_dim = fusion_dim + meta_dim
         self.head = nn.Sequential(
-            nn.LayerNorm(joint_dim),
+            nn.LayerNorm(joint_dim),               # normalize across all joint features
             nn.Dropout(head_dropout),
-            nn.Linear(joint_dim,head_hidden_dim),
+            nn.Linear(joint_dim, head_hidden_dim), # accept the full concatenated vector
             nn.ReLU(),
             nn.Dropout(head_dropout),
-            nn.Linear(head_hidden_dim,1),
+            nn.Linear(head_hidden_dim, 1),
         )
 
     # ------------------------------------------------------------------ #
@@ -130,24 +145,34 @@ class SigLIPDistilBert(nn.Module):
         t_f = self.title_proj(out_title.last_hidden_state[:,0])
         s_f = self.sum_proj(out_sum.last_hidden_state[:,0])
 
-        joint_f = [img_f, t_f, s_f]
         yr_norm = batch["year_norm"].to(img_f.device)       # [B,1]
         yr_f = self.year_proj(yr_norm) 
-        joint_f.append(yr_f)
+
 
         # channel embed
         ch_f = self.ch_emb(batch["channel_idx"].to(img_f.device))
-        joint_f.append(ch_f)
         
         # channel×year interaction
         cy_in = torch.cat([ch_f, yr_f], dim=1)
         cy_f  = self.cy_proj(cy_in)
-        joint_f.append(cy_f)
         
         # 3) date flags
         date = torch.cat([batch[k].to(img_f.device) for k in
             ["m_sin","m_cos","d_sin","d_cos","h_sin","h_cos"]], dim=1)
         date_f = self.date_proj(date)
-        joint_f.append(date_f)
-        joint = torch.cat(joint_f, dim=-1)
+
+        # Combine different latent spaces
+        modalities = torch.stack([img_f, t_f, s_f], dim=1)     # [B, 3, D]
+        fused      = self.fusion_transformer(modalities)      # [B, 3, D]
+        pooled     = fused.mean(dim=1)  # [B, D]
+
+
+        # 4) append metadata embeddings as before
+        meta = torch.cat([yr_f, ch_f, cy_f, date_f], dim=-1)  # [B, meta_dim]
+
+        # 5) final joint
+        joint = pooled + 0  # copy pooled into new tensor
+        joint = torch.cat([joint, meta], dim=-1)  # [B, D + meta_dim]
+
+        # 6) head
         return self.head(joint).squeeze(1)

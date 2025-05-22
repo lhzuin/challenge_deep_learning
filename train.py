@@ -79,6 +79,7 @@ def train(cfg):
         "params": adapter_params,
         "lr": head_lr,
     })
+
     
     head_params = list(model.head.parameters())
     # always optimize any of these if they exist:
@@ -87,6 +88,14 @@ def train(cfg):
             head_params += list(getattr(model, attr).parameters())
     
     param_groups.append({"params": head_params,     "lr": head_lr})
+
+    # after adapter_params and head_params...
+    if hasattr(model, "fusion_transformer"):
+        fusion_params = list(model.fusion_transformer.parameters())
+        param_groups.append({
+            "params": fusion_params,
+            "lr": head_lr,   # or a small fraction of body_lr if you prefer
+        })
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     datamodule = hydra.utils.instantiate(cfg.datamodule)
