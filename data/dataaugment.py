@@ -62,6 +62,6 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
             new_path = os.path.join(output_images_dir, new_name)
             img_aug.save(new_path)
             d = descriptions[id].copy()
-            d['id'] = new_name
+            d['id'] = new_name[:-4]
             writer.writerow(d)
 print("Augmentation terminée.")
