@@ -8,6 +8,10 @@ defaults:
     - loss_fn: msle
 
 epochs: 30 #50 / 35
+
+early_stopping:
+  patience: 2
+  min_epochs: 3
 use_warmup: true
 warmup_fraction: 0.02
 unfreeze_fraction: 0.15

@@ -130,6 +130,10 @@ def train(cfg):
             {"sanity_checks/val_images": wandb.Image(val_sanity)}
         ) if logger is not None else None
 
+    best_val_loss = float("inf")
+    epochs_since_improve = 0
+    patience = cfg.early_stopping.patience
+    min_epochs = cfg.early_stopping.min_epochs
     # -- loop over epochs
     for epoch in tqdm(range(cfg.epochs), desc="Epochs"):
         # -- loop over training batches
@@ -195,6 +199,18 @@ def train(cfg):
                 if logger is not None
                 else None
             )
+            # ––– check for improvement –––
+            if epoch_val_loss < best_val_loss:
+                best_val_loss = epoch_val_loss
+                epochs_since_improve = 0
+                torch.save(model.state_dict(), cfg.checkpoint_path)
+                print(f"[Epoch {epoch:02d}] New best val loss: {best_val_loss:.4f} (saved)")
+            else:
+                epochs_since_improve += 1
+                print(f"[Epoch {epoch:02d}] No improvement: {epoch_val_loss:.4f} (best {best_val_loss:.4f}), patience {epochs_since_improve}/{patience}")
+                if epochs_since_improve >= patience and epoch >= min_epochs:
+                    print(f"Early stopping triggered. Stopping at epoch {epoch}.")
+                    break
         
         if hasattr(model, "epoch_scheduler_hook"):
             model.epoch_scheduler_hook() 
