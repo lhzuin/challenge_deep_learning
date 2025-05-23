@@ -30,6 +30,7 @@ class DataModule:
         self.aug = 4
         # build the two subsets exactly once
         self._create_split_newest()
+       # self._create_champion()
         #self._create_split()
 
     def _create_split(self):
@@ -66,7 +67,19 @@ class DataModule:
         # 3) wrap with Subset
         self.train_set = Subset(full, old_idx)
         self.val_set   = Subset(full, newest_idx)
-
+    def _create_champion(self):
+        full = Dataset(
+            self.dataset_path,
+            "train_val_gpt_aug3",
+            transforms=self.test_transform,   # no augmentations for the split
+            metadata=self.metadata,
+        )
+        n=len(full)
+        num=np.random.randint(0, n-1)
+        while full.info["aug"][num] :
+            num-=1
+        self.val_set=Subset(full, [num])
+        self.train_set=Subset(full, [i for i in range(n) if full.info["Unnamed: 0"][i] != full.info["Unnamed: 0"][num]])
 
     def train_dataloader(self):
         return DataLoader(

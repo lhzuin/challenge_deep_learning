@@ -13,7 +13,7 @@ output_images_dir = "dataset/train_val_gpt_aug3"  # dossier de sortie pour les i
 descriptions_csv = "dataset/train_val_gpt.csv"  # fichier CSV : image,description
 descriptions_csv2 = "dataset/train_val_gpt2.csv"  # fichier CSV : image,description
 descriptions_csv3 = "dataset/train_val_gpt3.csv"  # fichier CSV : image,description
-descriptions_csv4 = "dataset/train_val_gpt3.csv"  # fichier CSV : image,description
+descriptions_csv4 = "dataset/train_val_gpt4.csv"  # fichier CSV : image,description
 output_csv = "dataset"  # dossier de sortie pour le CSV
 
 os.makedirs(output_images_dir, exist_ok=True)
