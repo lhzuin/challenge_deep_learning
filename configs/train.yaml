@@ -4,17 +4,17 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: img12_distilbert_attention_lora
+    - model: siglip_distilbert_lora
     - loss_fn: msle
 
-epochs: 5 #50 / 35
+epochs: 10 #50 / 35
 
 early_stopping:
   patience: 1
-  min_epochs: 3
+  min_epochs: 10
 use_warmup: true
 warmup_fraction: 0.02
-unfreeze_fraction: 0.15
+unfreeze_fraction: 0.15 #not used
 layer_decay: 0.8
 log: True
 prefix: ""

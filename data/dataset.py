@@ -62,7 +62,11 @@ class Dataset(torch.utils.data.Dataset):
         if "date_sin" in metadata:
             self.has_date_sin = True
             metadata.remove("date_sin")
-            ts = pd.to_datetime(info["date"])
+            ts = pd.to_datetime(
+                info["date"],
+                format="ISO8601",  # all ISO-8601 variants
+                utc=True
+            )
             self.month = ts.dt.month.values  # 1–12
             self.weekday = ts.dt.weekday.values # 0–6
             self.hour = ts.dt.hour.values  # 0–23
@@ -111,10 +115,10 @@ class Dataset(torch.utils.data.Dataset):
         }
 
         if self.has_title:
-            value["title"] = self.title[idx]
+            value["title"]   = str(self.title.iloc[idx])
         
         if self.has_summary:
-            value["summary"] = self.summary[idx]
+            value["summary"] = str(self.summary.iloc[idx])
 
         # 0) year_z 
         if self.has_year_z:
