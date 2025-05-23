@@ -157,3 +157,48 @@ class Dataset(torch.utils.data.Dataset):
         if hasattr(self, "targets"):
             value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
         return value
+    def subset(dataset, indices):
+        """Return a subset of the dataset."""
+        return Subset(self, indices)
+class Subset(Dataset):
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __getitem__(self, idx):
+        if isinstance(idx, list):
+            return [self.dataset[self.indices[i]] for i in idx]
+        return self.dataset[self.indices[idx]]
+
+    def __len__(self):
+        return len(self.indices)
+
+class ConcatDataset(Dataset):
+    def __init__(self, datasets):
+        self.datasets = list(datasets)
+        self.cumulative_sizes = self._cumsum(self.datasets)
+
+    def _cumsum(self, datasets):
+        r, s = [], 0
+        for d in datasets:
+            l = len(d)
+            r.append(l + s)
+            s += l
+        return r
+
+    def __getitem__(self, idx):
+        if idx < 0:
+            if -idx > len(self):
+                raise ValueError("absolute value of index should not exceed dataset length")
+            idx = len(self) + idx
+        dataset_idx = 0
+        while idx >= self.cumulative_sizes[dataset_idx]:
+            dataset_idx += 1
+        if dataset_idx == 0:
+            sample_idx = idx
+        else:
+            sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
+        return self.datasets[dataset_idx][sample_idx]
+
+    def __len__(self):
+        return self.cumulative_sizes[-1]

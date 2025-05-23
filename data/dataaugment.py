@@ -6,8 +6,8 @@ import shutil
 from tqdm import tqdm
 
 input_images_dir = "dataset/train_val_gpt"  # dossier contenant les images d'origine
-output_images_dir = "dataset/train_val_gpt_aug7"  # dossier de sortie pour les images augmentées
-descriptions_csv = "dataset/train_val_gpt7.csv"  # fichier CSV : image,description
+output_images_dir = "dataset/train_val_gpt_aug3"  # dossier de sortie pour les images augmentées
+descriptions_csv = "dataset/train_val_gpt.csv"  # fichier CSV : image,description
 output_csv = "dataset"  # dossier de sortie pour le CSV
 
 os.makedirs(output_images_dir, exist_ok=True)
@@ -22,10 +22,10 @@ with open(descriptions_csv, newline='', encoding='utf-8') as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         descriptions[row['id']] = row
+        descriptions[row['id']]['aug']=False
 
 def perturb_image(img):
-    angle = random.uniform(-10, 10)
-    img = img.rotate(angle)
+    
     enhancer = ImageEnhance.Contrast(img)
     img = enhancer.enhance(random.uniform(0.8, 1.2))
     if random.random() < 0.3:
@@ -37,11 +37,11 @@ def perturb_image(img):
         pixels[x, y] = tuple(random.randint(0, 255) for _ in range(3))
     return img
 
-n_augmentations = 7# nombre d'augmentations par image
-output_csv = os.path.join(output_csv, "train_val_gpt_aug7.csv")
+n_augmentations = 3# nombre d'augmentations par image
+output_csv = os.path.join(output_csv, "train_val_gpt_aug3.csv")
 
 with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
-    fieldnames = ['Unnamed: 0', 'id', 'channel', 'title', 'date', 'views', 'year', 'summary']
+    fieldnames = ['Unnamed: 0', 'id', 'channel', 'title', 'date', 'views', 'year', 'summary',"aug"]
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
     writer.writeheader()
 
@@ -63,5 +63,6 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
             img_aug.save(new_path)
             d = descriptions[id].copy()
             d['id'] = new_name[:-4]
+            d['aug']=True
             writer.writerow(d)
 print("Augmentation terminée.")

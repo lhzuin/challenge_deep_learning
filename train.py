@@ -4,12 +4,12 @@ import hydra
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
-
+import numpy as np
 
 from utils.sanity import show_images
 import signal, sys
 import os
-
+from PIL import Image
 
 
 @hydra.main(config_path="configs", config_name="train", version_base="1.1")
@@ -31,7 +31,13 @@ def train(cfg):
     # Instantiate model and loss
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
-    
+    continu=False
+    if continu:# Load the saved state dict
+        checkpoint_path = 'checkpoints/SIGLIP_DISTILBERT_ATTENTION_LORA_2025-05-22_23-15-08.pt'
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+
     # Configuring Early Stop
     def save_and_exit(*_):
         torch.save(model.state_dict(), cfg.checkpoint_path)
@@ -51,14 +57,25 @@ def train(cfg):
     # ------------------------------------------------------------------ #
     param_groups = []
     decay = cfg.layer_decay
-    num_blocks = len(model.img_encoder.visual.trunk.blocks)
-    # collect all transformer blocks, assign lr = body_lr * decay**(depth)
-    for depth, module in enumerate(model.img_encoder.visual.trunk.blocks):
-        
-        param_groups.append({
-        "params": module.parameters(),
-        "lr": body_lr * (decay ** (num_blocks - depth - 1))
-        })
+    try :
+        num_blocks = len(model.img_encoder.visual.trunk.blocks)
+        # collect all transformer blocks, assign lr = body_lr * decay**(depth)
+        for depth, module in enumerate(model.img_encoder.visual.trunk.blocks):
+            
+            param_groups.append({
+            "params": module.parameters(),
+            "lr": body_lr * (decay ** (num_blocks - depth - 1))
+            })
+    except AttributeError:
+        num_blocks = len(model.img_encoder1.visual.trunk.blocks)
+        # collect all transformer blocks, assign lr = body_lr * decay**(depth)
+        for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
+            
+            param_groups.append({
+            "params": module.parameters(),
+            "lr": body_lr * (decay ** (num_blocks - depth - 1))
+            })
+    
 
 
     text_blocks = model.text_encoder.transformer.layer  # or .resblocks, depending on your model
@@ -101,6 +118,16 @@ def train(cfg):
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     train_loader = datamodule.train_dataloader()
     val_loader   = datamodule.val_dataloader()
+    train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)
+
+    img_dir = "data/centroids"  # Path to the directory containing images
+    img_files = [f for f in os.listdir(img_dir) if f.lower().endswith('.jpg')]
+    transfo=torch.zeros(len(img_files), 1,3, 224, 224)
+    for i,fname in enumerate(img_files):
+        #img = Image.open(os.path.join(img_dir, fname)).convert('L').resize((64, 64))  # grayscale, 64x64
+        img = Image.open(os.path.join(img_dir, fname)).convert('RGB')  # full hd
+        transfo[i]= train_transform(img).unsqueeze(0)
+    torch.save(transfo,'data/transformed_centroids.pt')
 
     # ── cosine-with-warmup scheduler ───────────────────────────
     if cfg.use_warmup:

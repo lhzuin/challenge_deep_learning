@@ -4,10 +4,10 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: siglip_distilbert_attention_lora
+    - model: img12_distilbert_attention_lora
     - loss_fn: msle
 
-epochs: 30 #50 / 35
+epochs: 5 #50 / 35
 
 early_stopping:
   patience: 1

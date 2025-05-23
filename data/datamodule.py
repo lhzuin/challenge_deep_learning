@@ -1,6 +1,7 @@
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader, random_split, Subset,ConcatDataset
 import torch
 import numpy as np
+import random
 
 from data.dataset import Dataset
 
@@ -26,7 +27,7 @@ class DataModule:
 
         self.val_ratio = val_ratio
         self.seed = seed
-
+        self.aug = 4
         # build the two subsets exactly once
         self._create_split_newest()
         #self._create_split()
@@ -34,30 +35,32 @@ class DataModule:
     def _create_split(self):
         full = Dataset(
             self.dataset_path,
-            "train_val_gpt_aug",
+            "train_val_gpt_aug_3",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
-
-        val_len = int(self.val_ratio * len(full))
-        train_len = len(full) - val_len
-
-        self.train_set, self.val_set = random_split(
-            full,
-            lengths=[train_len, val_len],
-            generator=torch.Generator().manual_seed(self.seed),
-        )
-
+        
+        val_len = int(self.val_ratio * len(full)/self.aug)
+        val_idx,train_idx= self.random_split_range(len(full), val_len)
+        self.train_set=ConcatDataset([Subset(full, train_idx*self.aug+i) for i in range(self.aug)])
+        self.val_set=Subset(full, val_idx*self.aug+3)
+        
+    def random_split_range(self, n, p):
+        indices = list(range(n))
+        rng = random.Random(self.seed)  # Use self.seed for reproducibility
+        rng.shuffle(indices)
+        return indices[:p], indices[p:]
     def _create_split_newest(self):
         full = Dataset(
             self.dataset_path,
-            "train_val_gpt_aug",
+            "train_val_gpt_aug3",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
 
         years = full.info["year"].values
-        newest_idx = np.where(years >= 2022)[0].tolist()
+        aug   = full.info["aug"].values
+        newest_idx = np.where((years >= 2022) + (1- aug))[0].tolist()
         old_idx    = np.where(years <  2022)[0].tolist()
 
         # 3) wrap with Subset

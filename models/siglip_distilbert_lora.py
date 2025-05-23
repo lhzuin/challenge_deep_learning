@@ -23,7 +23,7 @@ class SigLIPDistilBert(nn.Module):
         pretrained="webli"
 
         distilbert_name = "distilbert-base-uncased"
-        
+       
         # image tower -----------------------------------------------------------
         self.img_encoder, self.pre_tf, self.val_tf = open_clip.create_model_and_transforms(
             siglip_name, pretrained=pretrained
@@ -62,7 +62,12 @@ class SigLIPDistilBert(nn.Module):
             p.requires_grad = False
         bert_dim = self.text_encoder.config.hidden_size
 
+        D = min(clip_dim, bert_dim)
 
+        self.title_proj   = nn.Linear(bert_dim, D)
+        self.sum_proj     = nn.Linear(bert_dim, D)  
+       
+        self.img_proj     = nn.Linear(clip_dim, D)
 
         # ── continuous year MLP ─────────────────────────────────
         self.year_proj = nn.Sequential(
@@ -70,19 +75,21 @@ class SigLIPDistilBert(nn.Module):
             nn.ReLU(),
             nn.LayerNorm(year_proj_dim),
         )
-    
+   
 
         # ── channel×year interaction ────────────────────────────
-        
+       
         self.cy_proj = nn.Sequential(
             nn.Linear(ch_emb_dim + year_proj_dim, cy_hidden),
             nn.ReLU(),
             nn.LayerNorm(cy_hidden),
         )
-        
+       
         # ── channel embedding ────────────────────────────────────
         self.ch_emb = nn.Embedding(num_channels, ch_emb_dim)
-        
+       
+        # ── bucketed year embedding ─────────────────────────────
+        #self.year_emb  = nn.Embedding(num_year_buckets, year_emb_dim)
 
         # ── date features MLP ───────────────────────────────────
         self.date_proj = nn.Sequential(
@@ -94,21 +101,22 @@ class SigLIPDistilBert(nn.Module):
 
         # ── regression head ──────────────────────────────────────
         joint_dim = (
-            2*bert_dim      +
-            clip_dim        +
+            3*D             +  # image + text
             ch_emb_dim      +
             year_proj_dim   +
+            #year_emb_dim    +
             date_proj_dim   +
             cy_hidden
         )
-
+        #self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Dropout(p=0.1), nn.Linear(joint_dim,1))
         self.head = nn.Sequential(
             nn.LayerNorm(joint_dim),
             nn.Dropout(head_dropout),
             nn.Linear(joint_dim,head_hidden_dim),
             nn.ReLU(),
             nn.Dropout(head_dropout),
-            nn.Linear(head_hidden_dim,1),
+            nn.Linear(head_hidden_dim, 1),  
+            #nn.Softplus()
         )
 
     # ------------------------------------------------------------------ #
@@ -116,6 +124,7 @@ class SigLIPDistilBert(nn.Module):
     # ------------------------------------------------------------------ #
     def forward(self, batch):
         img_f = self.img_encoder.encode_image(batch["image"])
+        img_f = self.img_proj(img_f)
 
         tok_title = self.tokenizer(batch["title"], padding=True, truncation=True, max_length=64, return_tensors="pt").to(img_f.device)
         tok_title = {k:v.to(img_f.device) for k,v in tok_title.items()}
@@ -131,18 +140,22 @@ class SigLIPDistilBert(nn.Module):
 
         joint_f = [img_f, t_f, s_f]
         yr_norm = batch["year_norm"].to(img_f.device)       # [B,1]
-        yr_f = self.year_proj(yr_norm) 
+        yr_f = self.year_proj(yr_norm)
         joint_f.append(yr_f)
 
         # channel embed
         ch_f = self.ch_emb(batch["channel_idx"].to(img_f.device))
         joint_f.append(ch_f)
-        
+       
         # channel×year interaction
         cy_in = torch.cat([ch_f, yr_f], dim=1)
         cy_f  = self.cy_proj(cy_in)
         joint_f.append(cy_f)
-        
+
+        # Year bucket
+        #yr_emb_f = self.year_emb(batch["year_idx"].to(img_f.device))   # [B, year_emb_dim]
+        #joint_f.append(yr_emb_f)
+       
         # 3) date flags
         date = torch.cat([batch[k].to(img_f.device) for k in
             ["m_sin","m_cos","d_sin","d_cos","h_sin","h_cos"]], dim=1)
