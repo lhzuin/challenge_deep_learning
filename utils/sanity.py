@@ -16,13 +16,15 @@ def show_images(data_loader, num_images=5, name="sanity_check"):
         The name of the file to save the plot to.
     """
     # - get the first batch of images
+    num_images = min(num_images, len(data_loader.dataset))
     iteration = iter(data_loader)
     # inputs = next(iteration)
     # - create the plot
     rows = int(num_images**0.5)
     cols = (num_images // rows) + (num_images % rows > 0)
     fig, axs = plt.subplots(nrows=rows, ncols=cols, squeeze=True, figsize=(15, 15))
-    axs = axs.flatten()
+    if num_images>1:
+        axs = axs.flatten()
 
     # - show the images
     for i in range(num_images):
@@ -32,11 +34,18 @@ def show_images(data_loader, num_images=5, name="sanity_check"):
             [0.485, 0.456, 0.406]
         ).view(3, 1, 1)
         i_img = F.to_pil_image(i_img)
-        axs[i].imshow(i_img)
-        axs[i].axis("off")
+        if num_images>1:
+            axs[i].imshow(i_img)
+            axs[i].axis("off")
+        else:
+            axs.imshow(i_img)
+            axs.axis("off")
 
     # - remove any unused subplots
-    for j in range(num_images, len(axs)):
-        fig.delaxes(axs[j])
+    if num_images>1:
+        for j in range(num_images, len(axs)):
+            fig.delaxes(axs[j])
+    else:
+        fig.delaxes(axs)
     plt.close(fig)
     return fig

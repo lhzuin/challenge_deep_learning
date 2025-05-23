@@ -29,8 +29,8 @@ class DataModule:
         self.seed = seed
         self.aug = 4
         # build the two subsets exactly once
-        self._create_split_newest()
-       # self._create_champion()
+        #self._create_split_newest()
+        self._create_champion()
         #self._create_split()
 
     def _create_split(self):
