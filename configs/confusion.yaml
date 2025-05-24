@@ -1,0 +1,43 @@
+version_base: 1.1
+
+defaults:
+    - _self_
+    - dataset: default
+    - optim: adamw
+    - model: img12_distilbert_attention_lora
+    - loss_fn: msle
+
+epochs: 4 #50 / 35
+
+early_stopping:
+  patience: 1
+  min_epochs: 10
+use_warmup: true
+warmup_fraction: 0.02
+unfreeze_fraction: 0.15 #not used
+layer_decay: 0.8
+log: True
+prefix: ""
+experiment_name: ${prefix}${model.name}_${now:%Y-%m-%d_%H-%M-%S}
+
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+datamodule:
+  _target_: data.datamodule.DataModule
+  dataset_path: ${data_dir}
+  train_transform: ${dataset.train_transform}
+  test_transform: ${dataset.val_transform}
+  batch_size: ${dataset.batch_size}
+  num_workers: ${dataset.num_workers}
+  metadata: ${dataset.metadata}
+
+data_dir: ${root_dir}/dataset/
+root_dir:  ${hydra:runtime.cwd}
+checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
+
+
+

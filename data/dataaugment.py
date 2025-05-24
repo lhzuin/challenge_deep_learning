@@ -102,7 +102,7 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
         writer.writerow(descriptions_lst[0][id])
         img = Image.open(img_path).convert("RGB")
 
-        for i in tqdm(range(1,n_augmentations+1), desc=f"Aug {filename}", leave=False):
+        for i in range(1,n_augmentations+1):
             img_aug = perturb_image(img)
             new_name = f"{id}_aug{i+1}.jpg"
             new_path = os.path.join(output_images_dir, new_name)

@@ -29,14 +29,15 @@ class DataModule:
         self.seed = seed
         self.aug = 4
         # build the two subsets exactly once
+        self._create_split_newest()
         #self._create_split_newest()
-        self._create_champion()
+        #self._create_champion()
         #self._create_split()
 
     def _create_split(self):
         full = Dataset(
             self.dataset_path,
-            "train_val_gpt_aug_3",
+            "train_val_gpt_aug3",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
@@ -61,7 +62,7 @@ class DataModule:
 
         years = full.info["year"].values
         aug   = full.info["aug"].values
-        newest_idx = np.where((years >= 2022) + (1- aug))[0].tolist()
+        newest_idx = np.where((years >= 2022) & (aug == 0))[0].tolist()
         old_idx    = np.where(years <  2022)[0].tolist()
 
         # 3) wrap with Subset

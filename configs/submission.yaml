@@ -1,8 +1,7 @@
 defaults:
     - _self_
     - dataset: default
-    - model: siglip_distilbert_lora
-
+    - model: img12_distilbert_attention_lora
 
 hydra:
   output_subdir: null
@@ -10,6 +9,7 @@ hydra:
     dir: .
 
 data:
+  a: 1
   dataset_path: ${data_dir}
   test_transform: ${dataset.val_transform}
   batch_size: ${dataset.batch_size}
@@ -18,7 +18,8 @@ data:
 
 data_dir: ${root_dir}/dataset/
 prefix: ""
-time_stamp: 2025-05-22_12-55-25
+time_stamp: 2025-05-24_00-05-58
+
 experiment_name: ${prefix}${model.name}_${time_stamp}
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
