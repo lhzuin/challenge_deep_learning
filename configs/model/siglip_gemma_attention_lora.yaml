@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+pretrained: webli
+instance:
+  _target_: models.siglip_gemma_attention_lora.SigLIPGemmaAttentionLora
+  num_channels: 47
+  head_hidden_dim: 256
+  head_dropout: 0.15
+  ch_emb_dim: 16
+  year_proj_dim: 8
+  date_proj_dim: 16
+  cy_hidden: 16
+
+name: SIGLIP_GEMMA_ATTENTION_LORA

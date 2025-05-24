@@ -4,14 +4,14 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: siglip_distilbert_lora
+    - model: siglip_gemma_attention_lora
     - loss_fn: msle
 
-epochs: 10 #50 / 35
+epochs: 4 #50 / 35
 
 early_stopping:
   patience: 1
-  min_epochs: 10
+  min_epochs: 2
 use_warmup: true
 warmup_fraction: 0.02
 unfreeze_fraction: 0.15 #not used

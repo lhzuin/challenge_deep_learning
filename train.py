@@ -11,6 +11,26 @@ import signal, sys
 import os
 from PIL import Image
 
+def get_text_blocks(peft_model):
+    """
+    Return the list/ModuleList that contains the transformer blocks
+    inside a PEFT-wrapped text backbone, for both BERT- and LLama/Gemma-like
+    architectures. Returns None if nothing is trainable (all frozen).
+    """
+    # 1) DistilBERT / BERT / RoBERTa
+    if hasattr(peft_model, "transformer"):
+        return peft_model.transformer.layer
+
+    # 2) Llama-family: PeftModel.model.model.layers
+    if hasattr(peft_model, "model"):
+        inner = peft_model.model                       # GemmaForCausalLM
+        if hasattr(inner, "model") and hasattr(inner.model, "layers"):
+            return inner.model.layers
+        if hasattr(inner, "layers"):                   # some Falcon-style models
+            return inner.layers
+
+    # 3) Nothing found → return None
+    return None
 
 @hydra.main(config_path="configs", config_name="train", version_base="1.1")
 def train(cfg):
@@ -77,15 +97,16 @@ def train(cfg):
             })
     
 
+    # ───────── text blocks for layer-decay LR ─────────
+    text_blocks = get_text_blocks(model.text_encoder)  # your helper
+    if any(p.requires_grad for p in model.text_encoder.base_model.parameters()):
+        num_text_blocks = len(text_blocks)
+        for depth, module in enumerate(text_blocks):
+            layer_lr = body_lr * (decay ** (num_text_blocks - depth - 1))
+            param_groups.append({"params": module.parameters(), "lr": layer_lr})
+    else:
+        print("⚠  text backbone frozen → skipping layer-wise LR groups.")
 
-    text_blocks = model.text_encoder.transformer.layer  # or .resblocks, depending on your model
-    num_text_blocks = len(text_blocks)
-    for depth, module in enumerate(text_blocks):
-        layer_lr = body_lr * (decay ** (num_text_blocks - depth - 1))
-        param_groups.append({
-            "params": module.parameters(),
-            "lr": layer_lr,
-        })
     # --- collect LoRA adapter parameters at head_lr ---
     adapter_params = []
     for name, param in model.named_parameters():
@@ -113,6 +134,11 @@ def train(cfg):
             "params": fusion_params,
             "lr": head_lr,   # or a small fraction of body_lr if you prefer
         })
+    seen = set()
+    for g in param_groups:
+        uniq = [p for p in g["params"] if id(p) not in seen]
+        g["params"] = uniq                      # drop dups in-place
+        seen.update(map(id, uniq))
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     datamodule = hydra.utils.instantiate(cfg.datamodule)

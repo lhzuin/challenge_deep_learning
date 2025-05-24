@@ -15,6 +15,7 @@ descriptions_csv2 = "dataset/train_val_gpt2.csv"  # fichier CSV : image,descript
 descriptions_csv3 = "dataset/train_val_gpt3.csv"  # fichier CSV : image,description
 descriptions_csv4 = "dataset/train_val_gpt4.csv"  # fichier CSV : image,description
 output_csv = "dataset"  # dossier de sortie pour le CSV
+name_out_csv = "train_val_gpt_aug3.csv"
 
 os.makedirs(output_images_dir, exist_ok=True)
 
@@ -84,7 +85,7 @@ def jitter_timestamp(ts: str, max_days: int = 2) -> str:
     return dt_jittered.isoformat()
 
 n_augmentations = 3
-output_csv = os.path.join(output_csv, "train_val_gpt_aug.csv")
+output_csv = os.path.join(output_csv, name_out_csv)
 
 with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
     fieldnames = ['Unnamed: 0', 'id', 'channel', 'title', 'date', 'views', 'year', 'summary',"aug"]
