@@ -189,6 +189,8 @@ def train(cfg):
     min_epochs = cfg.early_stopping.min_epochs
     # -- loop over epochs
     for epoch in tqdm(range(cfg.epochs), desc="Epochs"):
+        if hasattr(train_loader.dataset, "set_epoch"):
+            train_loader.dataset.set_epoch(epoch)
         # -- loop over training batches
         model.train()
         epoch_train_loss = 0

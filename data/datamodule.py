@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader, random_split, Subset,ConcatDataset
-import torch
 import numpy as np
 import random
+from data.random_per_id import RandomPerIdDataset
 
 from data.dataset import Dataset
 
@@ -35,52 +35,92 @@ class DataModule:
         #self._create_split()
 
     def _create_split(self):
-        full = Dataset(
+        base = Dataset(
             self.dataset_path,
             "train_val_gpt_aug3",
             transforms=self.test_transform,   # no augmentations for the split
             metadata=self.metadata,
         )
-        
-        val_len = int(self.val_ratio * len(full)/self.aug)
-        val_idx,train_idx= self.random_split_range(len(full), val_len)
-        self.train_set=ConcatDataset([Subset(full, train_idx*self.aug+i) for i in range(self.aug)])
-        self.val_set=Subset(full, val_idx*self.aug+3)
+
+        # 1 — wrapper that produces ONE sample per base-id
+        full = RandomPerIdDataset(base, mix_fields=("title", "summary"))
+
+        # 2 — operate only on ORIGINAL rows (aug==0)
+        originals = base.info.query("aug == 0")
+        all_ids   = originals["base_id"].unique().tolist()
+
+        rng = random.Random(self.seed)
+        rng.shuffle(all_ids)
+
+        val_len  = int(self.val_ratio * len(all_ids))
+        val_ids  = set(all_ids[:val_len])
+        train_ids= set(all_ids[val_len:])
+
+        # 3 — translate base-ids → indices in full.base_ids
+        train_idx, val_idx = [], []
+        for i, bid in enumerate(full.base_ids):
+            (train_idx if bid in train_ids else val_idx).append(i)
+
+        # 4 — final splits
+        self.train_set = Subset(full, train_idx)                   # random image/epoch
+        self.val_set   = Subset(base,                              # fixed originals
+                                originals.index[originals.base_id.isin(val_ids)].tolist())
+
         
     def random_split_range(self, n, p):
         indices = list(range(n))
         rng = random.Random(self.seed)  # Use self.seed for reproducibility
         rng.shuffle(indices)
         return indices[:p], indices[p:]
+    
     def _create_split_newest(self):
-        full = Dataset(
-            self.dataset_path,
-            "train_val_gpt_aug3",
-            transforms=self.test_transform,   # no augmentations for the split
-            metadata=self.metadata,
+        # 1) base Dataset (all rows, incl. aug)
+        base = Dataset(
+            dataset_path = self.dataset_path,
+            split        = "train_val_gpt_aug3",
+            transforms   = self.train_transform,
+            metadata     = self.metadata.copy(),
         )
 
-        years = full.info["year"].values
-        aug   = full.info["aug"].values
-        newest_idx = np.where((years >= 2022) & (aug == 0))[0].tolist()
-        old_idx    = np.where(years <  2022)[0].tolist()
+        # 2) wrapper that yields 1 sample per base_id
+        full = RandomPerIdDataset(
+            base_dataset = base,
+            mix_fields   = ("title", "summary"),
+        )
 
-        # 3) wrap with Subset
-        self.train_set = Subset(full, old_idx)
-        self.val_set   = Subset(full, newest_idx)
+        # 3) which base_id belong to the val set?  (≥ 2022 & not augmented)
+        val_row_mask = (base.info["year"] >= 2022) & (base.info["aug"] == 0)
+        val_ids      = set(base.info.loc[val_row_mask, "base_id"])
+
+        # 4) map base_id → index in full.base_ids
+        train_idx, val_idx = [], []
+        for i, bid in enumerate(full.base_ids):
+            (val_idx if bid in val_ids else train_idx).append(i)
+
+        self.train_set = Subset(full, train_idx)      # indices guaranteed < len(full)
+        # validation stays a “stable” plain Dataset (no random mixing)
+        self.val_set   = Subset(base, val_row_mask.to_numpy().nonzero()[0])
     def _create_champion(self):
-        full = Dataset(
-            self.dataset_path,
-            "train_val_gpt_aug3",
-            transforms=self.test_transform,   # no augmentations for the split
-            metadata=self.metadata,
+        base = Dataset(
+            dataset_path = self.dataset_path,
+            split        = "train_val_gpt_aug3",
+            transforms   = self.train_transform,
+            metadata     = self.metadata.copy(),
         )
-        n=len(full)
-        num=np.random.randint(0, n-1)
-        while full.info["aug"][num] :
-            num-=1
-        self.val_set=Subset(full, [num])
-        self.train_set=Subset(full, [i for i in range(n) if full.info["Unnamed: 0"][i] != full.info["Unnamed: 0"][num]])
+        full = RandomPerIdDataset(base, mix_fields=("title", "summary"))
+        # choose ONE original row whose aug==0
+        originals = base.info.query("aug == 0").reset_index()      # keep csv index
+        rng = random.Random(self.seed)
+        champ_row = originals.sample(n=1, random_state=rng).iloc[0]
+        champ_id  = champ_row["base_id"]
+
+        # indices in the wrapper
+        champ_csv_idx =  [int(champ_row["index"])]
+        train_idx = [i for i, bid in enumerate(full.base_ids) if bid != champ_id]
+
+        # build the two sets
+        self.train_set = Subset(full, train_idx)                   # all other videos
+        self.val_set   = Subset(base, champ_csv_idx)   # the one original
 
     def train_dataloader(self):
         return DataLoader(
