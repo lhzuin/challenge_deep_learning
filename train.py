@@ -4,12 +4,13 @@ import hydra
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
-import numpy as np
 
 from utils.sanity import show_images
 import signal, sys
 import os
 from PIL import Image
+
+OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 def get_text_blocks(peft_model):
     """
@@ -47,6 +48,7 @@ def train(cfg):
         device = torch.device("cpu")
     
     print(f"🏃‍♂️ Training process PID = {os.getpid()}")
+    print(f"To early stop, do: kill -SIGUSR1 {os.getpid()}")
 
     # Instantiate model and loss
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
@@ -61,7 +63,7 @@ def train(cfg):
     # Configuring Early Stop
     def save_and_exit(*_):
         torch.save(model.state_dict(), cfg.checkpoint_path)
-        print("🔖 checkpoint written to cfg.checkpoint_path")
+        print(f"🔖 checkpoint written to {cfg.checkpoint_path}")
         sys.exit(0)
 
     signal.signal(signal.SIGUSR1, save_and_exit)
@@ -86,6 +88,7 @@ def train(cfg):
             "params": module.parameters(),
             "lr": body_lr * (decay ** (num_blocks - depth - 1))
             })
+    
     except AttributeError:
         num_blocks = len(model.img_encoder1.visual.trunk.blocks)
         # collect all transformer blocks, assign lr = body_lr * decay**(depth)
@@ -95,7 +98,6 @@ def train(cfg):
             "params": module.parameters(),
             "lr": body_lr * (decay ** (num_blocks - depth - 1))
             })
-    
 
     # ───────── text blocks for layer-decay LR ─────────
     text_blocks = get_text_blocks(model.text_encoder)  # your helper

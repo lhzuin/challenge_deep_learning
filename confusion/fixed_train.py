@@ -15,6 +15,8 @@ import signal, sys
 import os
 from PIL import Image
 import pickle
+from omegaconf import OmegaConf
+OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 @hydra.main(config_path="../configs", config_name="confusion", version_base="1.1")
 def train(cfg):

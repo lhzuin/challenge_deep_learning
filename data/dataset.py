@@ -6,11 +6,12 @@ import numpy as np
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataset_path, split, transforms, metadata):
+    def __init__(self, dataset_path, split, transforms, metadata, train_on_log=False):
+        self.train_on_log = train_on_log
         self.mu = 2016.78
         self.sigma = 4.04
         self.min_year = 2011
-        self.max_year = 2025#2023
+        self.max_year = 2025
         self.dataset_path = dataset_path
         self.split = split
         # - read the info csvs
@@ -159,12 +160,18 @@ class Dataset(torch.utils.data.Dataset):
         
         # - don't have the target for test
         if hasattr(self, "targets"):
-            value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
+            if self.train_on_log:
+                y = torch.tensor(self.targets[idx], dtype=torch.float32)
+                y = torch.clamp(y, min=0.0)
+                value["target"] = torch.log1p(y)
+            else:
+                value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
         return value
     def subset(dataset, indices):
         """Return a subset of the dataset."""
-        return Subset(self, indices)
-class Subset(Dataset):
+        return CustomSubset(dataset, indices)
+
+class CustomSubset(Dataset):
     def __init__(self, dataset, indices):
         self.dataset = dataset
         self.indices = indices
@@ -177,7 +184,7 @@ class Subset(Dataset):
     def __len__(self):
         return len(self.indices)
 
-class ConcatDataset(Dataset):
+class CustomConcatDataset(Dataset):
     def __init__(self, datasets):
         self.datasets = list(datasets)
         self.cumulative_sizes = self._cumsum(self.datasets)

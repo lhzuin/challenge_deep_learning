@@ -1,5 +1,5 @@
 _target_: torch.optim.AdamW
-head_lr: 4e-3       # rapide
-body_lr: 2e-5        # lent
+head_lr: ${if:${dataset.train_on_log}, 2e-4, 4e-3}       # rapide
+body_lr: ${if:${dataset.train_on_log}, 2e-6, 2e-5}        # lent
 weight_decay: 0.01
 betas: [0.9, 0.999]

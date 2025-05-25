@@ -20,7 +20,10 @@ def mec(cfg_model):
     else:
         model.load_state_dict(checkpoint)
     model.eval()
-    datamodule=pkl.load(open("confusion/datamodule.pkl", "rb"))
+    try:
+        datamodule=pkl.load(open("confusion/datamodule.pkl", "rb"))
+    except:
+        datamodule = hydra.utils.instantiate(cfg_model.datamodule)
     val_set = datamodule.val_dataloader()
     pbar = tqdm(val_set, desc=f"heh {0}", leave=False)
     confusion_mat = Confusion_matrix(num_classes=20)

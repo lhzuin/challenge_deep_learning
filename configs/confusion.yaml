@@ -4,7 +4,7 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: img12_distilbert_attention_lora
+    - model: siglip_gemma_attention_lora
     - loss_fn: msle
 
 epochs: 4 #50 / 35
@@ -34,6 +34,8 @@ datamodule:
   batch_size: ${dataset.batch_size}
   num_workers: ${dataset.num_workers}
   metadata: ${dataset.metadata}
+  train_on_log: ${dataset.train_on_log}
+  augmentation: ${dataset.augmentation}
 
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}

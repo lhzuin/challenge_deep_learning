@@ -5,17 +5,17 @@ defaults:
     - dataset: default
     - optim: adamw
     - model: siglip_gemma_attention_lora
-    - loss_fn: msle
+    - loss_fn: mse # Change for msle if not log
 
-epochs: 4 #50 / 35
+epochs: 5 #50 / 35
 
 early_stopping:
-  patience: 1
-  min_epochs: 2
+  patience: 2
+  min_epochs: 7
 use_warmup: true
 warmup_fraction: 0.02
 unfreeze_fraction: 0.15 #not used
-layer_decay: 0.8
+layer_decay: ${if:${dataset.train_on_log}, 0.9, 0.8}
 log: True
 prefix: ""
 experiment_name: ${prefix}${model.name}_${now:%Y-%m-%d_%H-%M-%S}
@@ -34,6 +34,11 @@ datamodule:
   batch_size: ${dataset.batch_size}
   num_workers: ${dataset.num_workers}
   metadata: ${dataset.metadata}
+  val_ratio: ${dataset.val_ratio}
+  seed: ${dataset.seed}
+  train_on_log: ${dataset.train_on_log}
+  augmentation: ${dataset.augmentation}
+
 
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}

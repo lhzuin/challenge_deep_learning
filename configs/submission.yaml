@@ -1,7 +1,7 @@
 defaults:
     - _self_
     - dataset: default
-    - model: img12_distilbert_attention_lora
+    - model: siglip_gemma_attention_lora
 
 hydra:
   output_subdir: null
@@ -18,11 +18,25 @@ data:
 
 data_dir: ${root_dir}/dataset/
 prefix: ""
-time_stamp: 2025-05-24_00-05-58
+time_stamp: 2025-05-24_21-11-40
 
 experiment_name: ${prefix}${model.name}_${time_stamp}
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
 unfreeze_fraction: 0.15
 epochs: 90
+train_on_log: ${dataset.train_on_log}
 
+
+datamodule:
+  _target_: data.datamodule.DataModule
+  dataset_path: ${data_dir}
+  train_transform: ${dataset.train_transform}
+  test_transform: ${dataset.val_transform}
+  batch_size: ${dataset.batch_size}
+  num_workers: ${dataset.num_workers}
+  metadata: ${dataset.metadata}
+  val_ratio: ${dataset.val_ratio}
+  seed: ${dataset.seed}
+  train_on_log: ${dataset.train_on_log}
+  augmentation: ${dataset.augmentation}

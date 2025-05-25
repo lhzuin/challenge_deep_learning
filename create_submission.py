@@ -2,8 +2,10 @@ import hydra
 from torch.utils.data import DataLoader
 import pandas as pd
 import torch
-
+import numpy as np
 from data.dataset import Dataset
+from omegaconf import OmegaConf
+OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 
 @hydra.main(config_path="configs", config_name="submission")
@@ -34,6 +36,11 @@ def create_submission(cfg):
         batch["image"] = batch["image"].to(device)
         with torch.no_grad():
             preds = model(batch).squeeze().cpu().numpy()
+
+        if cfg.train_on_log:
+            preds = np.expm1(preds)       # exp(pred) – 1
+            preds = np.clip(preds, 0, None)
+
         submission = pd.concat(
             [
                 submission,
