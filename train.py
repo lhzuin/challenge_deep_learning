@@ -143,9 +143,8 @@ def train(cfg):
         seen.update(map(id, uniq))
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
-    datamodule = hydra.utils.instantiate(cfg.datamodule)
-    train_loader = datamodule.train_dataloader()
-    val_loader   = datamodule.val_dataloader()
+    datamodule_planification = hydra.utils.instantiate(cfg.datamodule)
+    
     train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)
 
     img_dir = "data/centroids"  # Path to the directory containing images
@@ -159,31 +158,37 @@ def train(cfg):
 
     # ── cosine-with-warmup scheduler ───────────────────────────
     if cfg.use_warmup:
-        num_epochs      = cfg.epochs
-        num_batches     = len(train_loader)
+        num_epochs      = 1
+        num_batches     = len(datamodule_planification[0]) // cfg.datset.batch_size
         total_steps     = num_epochs * num_batches
         num_warmup_steps = int(total_steps * cfg.warmup_fraction)
 
         scheduler = get_cosine_schedule_with_warmup(
             optimizer,
             num_warmup_steps=num_warmup_steps,
-            num_training_steps=total_steps,
+            num_training_steps=sum(
+                len(loader) for loader in datamodule_planification
+            ) // cfg.datset.batch_size 
         )
 
 
 
     # -- sanity check
-    train_sanity = show_images(train_loader, name="assets/sanity/train_images")
-    (
+    if cfg.sanity_check.enabled:
+        train_loader = datamodule_planification[0]
+        val_loader = datamodule_planification[1] if len(datamodule_planification) > 1 else None
+    
+        train_sanity = show_images(train_loader, name="assets/sanity/train_images")
+        (
         logger.log({"sanity_checks/train_images": wandb.Image(train_sanity)})
         if logger is not None
         else None
-    )
-    if val_loader is not None:
-        val_sanity = show_images(val_loader, name="assets/sanity/val_images")
-        logger.log(
-            {"sanity_checks/val_images": wandb.Image(val_sanity)}
-        ) if logger is not None else None
+        )
+        if val_loader is not None:
+            val_sanity = show_images(val_loader, name="assets/sanity/val_images")
+            logger.log(
+                {"sanity_checks/val_images": wandb.Image(val_sanity)}
+            ) if logger is not None else None
 
     best_val_loss = float("inf")
     epochs_since_improve = 0

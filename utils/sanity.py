@@ -3,7 +3,7 @@ import torch
 import torchvision.transforms.functional as F
 
 
-def show_images(data_loader, num_images=5, name="sanity_check"):
+def show_images(data_loader, num_images=1, name="sanity_check"):
     """Display a few images from the data loader.
 
     Parameters
