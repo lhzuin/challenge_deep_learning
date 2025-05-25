@@ -17,6 +17,9 @@ class Dataset(torch.utils.data.Dataset):
         # - read the info csvs
         #print(f"{dataset_path}/{split}.csv")
         info = pd.read_csv(f"{dataset_path}/{split}.csv")
+        if self.train_on_log:
+                info["views"] = info["views"].fillna(0).astype(float)
+                info["views"] = np.log1p(info["views"]).astype(float)
         self.info = info
         
         if "description" in info.columns:
@@ -90,6 +93,7 @@ class Dataset(torch.utils.data.Dataset):
                 .agg(lambda r: " + ".join(v for v in r if v), axis=1)
         )
         if "views" in info.columns:
+            
             self.targets = info["views"].values
 
         # - ids
@@ -160,16 +164,11 @@ class Dataset(torch.utils.data.Dataset):
         
         # - don't have the target for test
         if hasattr(self, "targets"):
-            if self.train_on_log:
-                y = torch.tensor(self.targets[idx], dtype=torch.float32)
-                y = torch.clamp(y, min=0.0)
-                value["target"] = torch.log1p(y)
-            else:
-                value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
+            value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
         return value
     def subset(self, indices):
         """Return a subset of the dataset."""
-        new_dataset = self.__class__(self.dataset_path, self.split, self.transforms, [])
+        new_dataset = self.__class__(self.dataset_path, self.split, self.transforms, [], train_on_log=self.train_on_log)
         new_dataset.info = self.info.iloc[indices].reset_index(drop=True)
         new_dataset.ids = self.ids[indices]
         new_dataset.text = self.text[indices]

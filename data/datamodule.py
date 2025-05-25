@@ -67,7 +67,11 @@ class DataModule:
         if epoch == 0:
             base = base.subset((base.info["year"] >= 2020).to_numpy().nonzero()[0])
         elif epoch <= 3:
-            base = base.subset(((base.info["year"] >= 2020) | (np.abs(np.log(base.info["views"]+1e-9) - 10) > 3)).to_numpy().nonzero()[0])
+            if self.train_on_log:
+                mask=np.abs(base.info["views"] -10 )>3
+            else:
+                mask=np.abs(np.log1p(base.info["views"]) - 10) > 3
+            base = base.subset(((base.info["year"] >= 2020) | mask).to_numpy().nonzero()[0])
         
         val_row_mask = (base.info["year"] >= 2022) & (base.info["aug"] == 0)
         val_ids = set(base.info.loc[val_row_mask, "id"])
