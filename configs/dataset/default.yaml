@@ -2,10 +2,7 @@ defaults:
     - val_transform: siglip
     - train_transform: siglip
 
-
-batch_size: 32
-
-
+batch_size: 16
 num_workers: 16
 metadata: ["title", "year_norm", "year_idx", "channel_idx", "date_sin","summary"] #
 val_ratio: 0.1 

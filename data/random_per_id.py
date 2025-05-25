@@ -16,7 +16,7 @@ class RandomPerIdDataset(torch.utils.data.Dataset):
         # -- group dataframe rows by base_id once ---------------------------
         df = self.base.info                      # <= already loaded dataframe
         self.groups = (
-            df.groupby("base_id", sort=False)
+            df.groupby("Unnamed: 0", sort=False)
               .apply(lambda g: g.index.to_numpy())   # ndarray of row-indices
               .to_dict()
         )

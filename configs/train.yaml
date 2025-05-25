@@ -4,11 +4,10 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: img12_distilbert_attention_lora
+    - model: img12_distilbert_attention_lora #siglip_gemma_attention_lora
     - loss_fn: msle
 
-epochs: 4 #50 / 35
-
+epochs: 10 #50 / 35
 
 early_stopping:
   patience: 2
@@ -28,22 +27,20 @@ hydra:
     dir: .
 
 datamodule:
-  _target_: data.datamodule.DataModule
+  _target_: data.datamodule.ConcatDataModule
   dataset_path: ${data_dir}
   train_transform: ${dataset.train_transform}
   test_transform: ${dataset.val_transform}
   batch_size: ${dataset.batch_size}
   num_workers: ${dataset.num_workers}
   metadata: ${dataset.metadata}
-<<<<<<< HEAD
+
   val_ratio: ${dataset.val_ratio}
   seed: ${dataset.seed}
   train_on_log: ${dataset.train_on_log}
   augmentation: ${dataset.augmentation}
-
-=======
   num_epochs: ${epochs}
->>>>>>> 414b9f8 (train for plaf=nification)
+  planification: "outliers"
 
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}

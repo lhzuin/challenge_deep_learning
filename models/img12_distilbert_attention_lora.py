@@ -12,7 +12,7 @@ class SigLIPDistilBert(nn.Module):
         self,
         num_channels: int = 47,
         head_hidden_dim: int = 256,
-        head_dropout: float = 0.15,
+        head_dropout: float = 0.05,
         ch_emb_dim: int = 16,
         year_proj_dim: int = 8,
         date_proj_dim: int = 16,
@@ -73,7 +73,7 @@ class SigLIPDistilBert(nn.Module):
         )
         self.text_encoder = get_peft_model(self.text_encoder, text_lora_cfg)
         for p in self.text_encoder.base_model.parameters():
-            p.requires_grad = False
+            p.requires_grad = True
         bert_dim = self.text_encoder.config.hidden_size
 
         D = min(clip_dim, bert_dim)

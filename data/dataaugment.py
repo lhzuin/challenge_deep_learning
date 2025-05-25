@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import random
 from torchvision import transforms as T
 
-input_images_dir = "dataset/train_val_gpt"  # dossier contenant les images d'origine
+input_images_dir = "dataset/train_val"  # dossier contenant les images d'origine
 output_images_dir = "dataset/train_val_gpt_aug3"  # dossier de sortie pour les images augmentées
-descriptions_csv = "dataset/train_val_gpt.csv"  # fichier CSV : image,description
+descriptions_csv = "dataset/train_val.csv"  # fichier CSV : image,description
 descriptions_csv2 = "dataset/train_val_gpt2.csv"  # fichier CSV : image,description
 descriptions_csv3 = "dataset/train_val_gpt3.csv"  # fichier CSV : image,description
 descriptions_csv4 = "dataset/train_val_gpt4.csv"  # fichier CSV : image,description

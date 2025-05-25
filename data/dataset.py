@@ -15,7 +15,7 @@ class Dataset(torch.utils.data.Dataset):
         self.dataset_path = dataset_path
         self.split = split
         # - read the info csvs
-        print(f"{dataset_path}/{split}.csv")
+        #print(f"{dataset_path}/{split}.csv")
         info = pd.read_csv(f"{dataset_path}/{split}.csv")
         self.info = info
         
@@ -167,11 +167,45 @@ class Dataset(torch.utils.data.Dataset):
             else:
                 value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
         return value
-    def subset(dataset, indices):
+    def subset(self, indices):
         """Return a subset of the dataset."""
+<<<<<<< HEAD
         return CustomSubset(dataset, indices)
 
 class CustomSubset(Dataset):
+=======
+        new_dataset = self.__class__(self.dataset_path, self.split, self.transforms, [])
+        new_dataset.info = self.info.iloc[indices].reset_index(drop=True)
+        new_dataset.ids = self.ids[indices]
+        new_dataset.text = self.text[indices]
+        if self.has_title:
+            new_dataset.title = self.title.iloc[indices].reset_index(drop=True)
+        if self.has_summary:
+            new_dataset.summary = self.summary.iloc[indices].reset_index(drop=True)
+        if self.has_year_z:
+            new_dataset.years = self.years[indices]
+        if self.has_year_norm:
+            new_dataset.years = self.years[indices]
+        if self.has_year_idx:
+            new_dataset.years = self.years[indices]
+        if self.has_date_sin:
+            new_dataset.month = self.month[indices]
+            new_dataset.weekday = self.weekday[indices]
+            new_dataset.hour = self.hour[indices]
+        if self.has_channel_idx:
+            new_dataset.ch_idx = self.ch_idx[indices]
+            new_dataset.ch_to_idx = self.ch_to_idx
+        new_dataset.transforms = self.transforms
+        new_dataset.has_year_z = self.has_year_z
+        new_dataset.has_year_norm = self.has_year_norm
+        new_dataset.has_year_idx = self.has_year_idx
+        new_dataset.has_date_sin = self.has_date_sin
+        new_dataset.has_channel_idx = self.has_channel_idx
+        new_dataset.has_title = self.has_title
+        new_dataset.has_summary = self.has_summary
+        return new_dataset
+class Subset(Dataset):
+>>>>>>> 27a24ec (planification)
     def __init__(self, dataset, indices):
         self.dataset = dataset
         self.indices = indices

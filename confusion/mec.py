@@ -36,7 +36,7 @@ def mec(cfg_model):
             pred_labels = np.int16(np.log(preds))
             confusion_mat.update(true_labels, pred_labels)
 
-    confusion_mat.print_matrix(save_path=f'confusion/{cfg_model.model.name}confusion_matrix.png')
+    confusion_mat.print_matrix(save_path=f'confusion/confusion_matrix/{cfg_model.model.name}{cfg_model.time_stamp}confusion_matrix.png')
 
 if __name__ == "__main__":
     mec()
