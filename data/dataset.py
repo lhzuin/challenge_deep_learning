@@ -169,11 +169,6 @@ class Dataset(torch.utils.data.Dataset):
         return value
     def subset(self, indices):
         """Return a subset of the dataset."""
-<<<<<<< HEAD
-        return CustomSubset(dataset, indices)
-
-class CustomSubset(Dataset):
-=======
         new_dataset = self.__class__(self.dataset_path, self.split, self.transforms, [])
         new_dataset.info = self.info.iloc[indices].reset_index(drop=True)
         new_dataset.ids = self.ids[indices]
@@ -205,7 +200,6 @@ class CustomSubset(Dataset):
         new_dataset.has_summary = self.has_summary
         return new_dataset
 class Subset(Dataset):
->>>>>>> 27a24ec (planification)
     def __init__(self, dataset, indices):
         self.dataset = dataset
         self.indices = indices

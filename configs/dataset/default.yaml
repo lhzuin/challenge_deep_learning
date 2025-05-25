@@ -1,11 +1,15 @@
+
 defaults:
     - val_transform: siglip
     - train_transform: siglip
+
+train_on_log: True
+
 
 batch_size: 16
 num_workers: 16
 metadata: ["title", "year_norm", "year_idx", "channel_idx", "date_sin","summary"] #
 val_ratio: 0.1 
 seed: 42
-train_on_log: true
+
 augmentation: true
