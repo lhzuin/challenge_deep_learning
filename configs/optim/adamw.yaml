@@ -1,5 +1,12 @@
 _target_: torch.optim.AdamW
-head_lr: 4e-3
-body_lr: 2e-5
+lr_body: ${if:${dataset.train_on_log}, 2e-6, 2e-5}        # lent
+
+lr_image_adapter: 2e-6    # only image‐LoRA
+lr_text_adapter: 1e-5    # only text‐LoRA (title+summary)
+lr_head: 5e-5    # head MLP, year/date/channel embeds, etc.
+lr_fusion: 5e-5    # fusion transformer or simple_fusion MLP
+lr_class: 3e-4
+
+
 weight_decay: 0.01
 betas: [0.9, 0.999]

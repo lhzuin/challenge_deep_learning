@@ -4,18 +4,26 @@ version_base: 1.1
 defaults:
     - _self_
     - dataset: default
-    - optim: adamw_normal
-    - model: siglip_gemma_attention_lora_log
+    - optim: adamw
+    - model: siglip_distilbert_lora_thaw #siglip_distilbert_lora_thaw #siglip_gemma_attention_lora_thaw
     - loss_fn: msle # Change for msle if not log or mse if log
 
-epochs: 9 
+epochs: 9 #50 / 35
 
+
+
+# Normal train
+num_epochs_phase1: ${model.num_epochs_phase1}
+num_epochs_phase2: ${model.num_epochs_phase2}
+num_epochs_phase3: ${model.num_epochs_phase3}
+num_epochs_phase4: ${model.num_epochs_phase4}
+num_epochs_phase5: ${model.num_epochs_phase5}
 
 early_stopping:
   patience: 2
   min_epochs: 7
 use_warmup: true
-warmup_fraction: 0.02
+warmup_fraction: 0.15
 unfreeze_fraction: 0.15 #not used
 layer_decay: ${if:${dataset.train_on_log}, 0.9, 0.8}
 log: False
@@ -29,30 +37,22 @@ hydra:
     dir: .
 
 datamodule:
-  _target_: data.datamodule.ConcatDataModule
+  _target_: data.datamodule.DataModule
   dataset_path: ${data_dir}
   train_transform: ${dataset.train_transform}
   test_transform: ${dataset.val_transform}
   batch_size: ${dataset.batch_size}
   num_workers: ${dataset.num_workers}
   metadata: ${dataset.metadata}
-
   val_ratio: ${dataset.val_ratio}
   seed: ${dataset.seed}
   train_on_log: ${dataset.train_on_log}
   augmentation: ${dataset.augmentation}
-  num_epochs: ${epochs}
-  planification: "same_champion" #"outliers"
-
 
 accum_steps: ${dataset.accum_steps}
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
-sanity_check:
-  enabled: false
-  num_samples: 1000
-  batch_size: 1
-  num_workers: 16
+
 
 

@@ -3,13 +3,12 @@ import json
 import pandas as pd
 from PIL import Image
 import numpy as np
+import math
 
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path, split, transforms, metadata, train_on_log=False):
         self.train_on_log = train_on_log
-        self.mu = 2016.78
-        self.sigma = 4.04
         self.min_year = 2011
         self.max_year = 2025
         self.dataset_path = dataset_path
@@ -21,6 +20,8 @@ class Dataset(torch.utils.data.Dataset):
                 info["views"] = info["views"].fillna(0).astype(float)
                 info["views"] = np.log1p(info["views"]).astype(float)
         self.info = info
+        logs = np.log1p(self.info["views"].values.astype(np.float64))
+        self.mu, self.sigma = logs.mean(), logs.std()
         
         if "description" in info.columns:
             info["description"] = info["description"].fillna("")
@@ -134,7 +135,8 @@ class Dataset(torch.utils.data.Dataset):
         # 1) year_norm ∈ [0,1]
         if self.has_year_norm:
             y = self.years[idx]
-            yr_norm = (y - self.min_year) / (self.max_year - self.min_year)
+            #yr_norm = (y - self.min_year) / (self.max_year - self.min_year)
+            yr_norm = 2*((y - self.min_year)/(self.max_year-self.min_year)) - 1.0
             value["year_norm"] = torch.tensor([yr_norm], dtype=torch.float32)
 
         # 2) year bucket for embedding (0..max_year-min_year,  else last idx)
@@ -164,9 +166,26 @@ class Dataset(torch.utils.data.Dataset):
         
         # - don't have the target for test
         if hasattr(self, "targets"):
-            value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
+            if self.train_on_log:
+                y = torch.tensor(self.targets[idx], dtype=torch.float32)
+                y = torch.clamp(y, min=0.0)
+                value["target"] = torch.log1p(y)
+            else:
+                value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
+
+        # build a 3-way label via ±2σ on the log-view
+        raw_views = self.targets[idx] if not self.train_on_log else np.expm1(self.targets[idx])
+        l = math.log(raw_views + 1)
+        if   l < self.mu - 2*self.sigma:
+            label = 0   # low
+        elif l > self.mu + 2*self.sigma:
+            label = 2   # high
+        else:
+            label = 1   # normal
+        value["label"] = torch.tensor(label, dtype=torch.long)
         return value
-    def subset(self, indices):
+    
+    def subset(dataset, indices):
         """Return a subset of the dataset."""
         new_dataset = self.__class__(self.dataset_path, self.split, self.transforms, [], train_on_log=self.train_on_log)
         new_dataset.info = self.info.iloc[indices].reset_index(drop=True)
