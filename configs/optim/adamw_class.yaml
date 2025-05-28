@@ -1,0 +1,6 @@
+_target_: torch.optim.AdamW
+lr_class: 3e-4
+
+
+weight_decay: 0.01
+betas: [0.9, 0.999]

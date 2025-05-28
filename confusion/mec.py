@@ -6,6 +6,8 @@ import	pickle as pkl
 import sys, os
 from tqdm import tqdm
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from omegaconf import OmegaConf
+OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 @hydra.main(config_path="../configs", config_name="submission")
 def mec(cfg_model):
@@ -21,7 +23,8 @@ def mec(cfg_model):
         model.load_state_dict(checkpoint)
     model.eval()
     try:
-        datamodule=pkl.load(open("confusion/datamodule.pkl", "rb"))
+        #datamodule=pkl.load(open("confusion/datamodule.pkl", "rb"))
+        datamodule = hydra.utils.instantiate(cfg_model.datamodule)
     except:
         datamodule = hydra.utils.instantiate(cfg_model.datamodule)
     val_set = datamodule.val_dataloader()
@@ -31,6 +34,9 @@ def mec(cfg_model):
         batch["image"] = batch["image"].to(device)
         with torch.no_grad():
             preds = model(batch).squeeze().cpu().numpy()
+            if cfg_model.train_on_log:
+                preds = np.expm1(preds)       # exp(pred) – 1
+                preds = np.clip(preds, 0, None)
             # Ensure batch["label"] is on CPU and numpy
             true_labels = np.int16(np.log(batch["target"].squeeze().cpu().numpy()))
             pred_labels = np.int16(preds-1)

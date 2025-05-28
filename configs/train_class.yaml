@@ -4,11 +4,11 @@ version_base: 1.1
 defaults:
     - _self_
     - dataset: default
-    - optim: adamw_normal
-    - model: siglip_gemma_attention_lora_log
-    - loss_fn: msle # Change for msle if not log or mse if log
+    - optim: adamw_class
+    - model: siglip_distilbert_lora_class
+    - loss_fn: cross_entropy
 
-epochs: 9 
+epochs: 2 #50 / 35
 
 
 early_stopping:
@@ -29,30 +29,22 @@ hydra:
     dir: .
 
 datamodule:
-  _target_: data.datamodule.ConcatDataModule
+  _target_: data.datamodule.DataModule
   dataset_path: ${data_dir}
   train_transform: ${dataset.train_transform}
   test_transform: ${dataset.val_transform}
   batch_size: ${dataset.batch_size}
   num_workers: ${dataset.num_workers}
   metadata: ${dataset.metadata}
-
   val_ratio: ${dataset.val_ratio}
   seed: ${dataset.seed}
   train_on_log: ${dataset.train_on_log}
   augmentation: ${dataset.augmentation}
-  num_epochs: ${epochs}
-  planification: "same_champion" #"outliers"
-
 
 accum_steps: ${dataset.accum_steps}
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
-sanity_check:
-  enabled: false
-  num_samples: 1000
-  batch_size: 1
-  num_workers: 16
+
 
 

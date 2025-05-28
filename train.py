@@ -13,6 +13,8 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
 import numpy as np
+from torch.amp import autocast, GradScaler
+
 from utils.sanity import show_images
 import signal
 import sys
@@ -60,7 +62,9 @@ def train(cfg):
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
     model = hydra.utils.instantiate(cfg.model.instance).to(dev)
     continu = False
-    if continu:  # Load the saved state dict
+    scaler = GradScaler(device="cuda")
+    continu=False
+    if continu:# Load the saved state dict
         checkpoint_path = 'checkpoints/SIGLIP_DISTILBERT_ATTENTION_LORA_2025-05-22_23-15-08.pt'
         empty_cache()
         ipc_collect()
@@ -77,8 +81,12 @@ def train(cfg):
 
     opt_cfg = OmegaConf.to_container(cfg.optim, resolve=True, enum_to_str=True)
     
-    head_lr = opt_cfg.pop("head_lr")
-    body_lr = opt_cfg.pop("body_lr")
+    lr_body = opt_cfg.pop("lr_body")
+
+    lr_image_adapter =  opt_cfg.pop("lr_image_adapter")  # only image‐LoRA
+    lr_text_adapter = opt_cfg.pop("lr_text_adapter")    # only text‐LoRA (title+summary)
+    lr_head = opt_cfg.pop("lr_head")    # head MLP, year/date/channel embeds, etc.
+    lr_fusion = opt_cfg.pop("lr_fusion")
 
     # ------------------------------------------------------------------ #
     # Build the two parameter groups                                  #
@@ -87,20 +95,23 @@ def train(cfg):
     decay = cfg.layer_decay
     try:
         num_blocks = len(model.img_encoder.visual.trunk.blocks)
+        # collect all transformer blocks, assign lr = lr_body * decay**(depth)
         for depth, module in enumerate(model.img_encoder.visual.trunk.blocks):
             param_groups.append({
-                "params": module.parameters(),
-                "lr": body_lr * (decay ** (num_blocks - depth - 1))
+            "params": module.parameters(),
+            "lr": lr_body * (decay ** (num_blocks - depth - 1))
             })
     
     except AttributeError:
-        try :
+        try:
             num_blocks = len(model.img_encoder1.visual.trunk.blocks)
+            # collect all transformer blocks, assign lr = lr_body * decay**(depth)
             for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
+                
                 param_groups.append({
                 "params": module.parameters(),
-                "lr": body_lr * (decay ** (num_blocks - depth - 1))
-            })
+                "lr": lr_body * (decay ** (num_blocks - depth - 1))
+                })
         except AttributeError:
             resnet_layers = [
                 model.img_encoder.layer1,
@@ -120,41 +131,68 @@ def train(cfg):
     if any(p.requires_grad for p in model.text_encoder.base_model.parameters()):
         num_text_blocks = len(text_blocks)
         for depth, module in enumerate(text_blocks):
-            layer_lr = body_lr * (decay ** (num_text_blocks - depth - 1))
+            layer_lr = lr_body * (decay ** (num_text_blocks - depth - 1))
             param_groups.append({"params": module.parameters(), "lr": layer_lr})
     else:
         print("⚠  text backbone frozen → skipping layer-wise LR groups.")
 
     # --- collect LoRA adapter parameters at head_lr ---
-    adapter_params = []
+    # --- collect image vs text LoRA adapters separately ---
+    img_lora_params = []
+    txt_lora_params = []
     for name, param in model.named_parameters():
-        if param.requires_grad and "lora_" in name:
-            adapter_params.append(param)
+        if not param.requires_grad or "lora_" not in name:
+            continue
+        if name.startswith("img_encoder") or "img_encoder" in name:
+            img_lora_params.append(param)
+        else:
+            txt_lora_params.append(param)
 
-    param_groups.append({
-        "params": adapter_params,
-        "lr": head_lr,
-    })
+    if img_lora_params:
+        param_groups.append({"params": img_lora_params, "lr": lr_image_adapter})
+    if txt_lora_params:
+        param_groups.append({"params": txt_lora_params, "lr": lr_text_adapter})
+
 
     head_params = list(model.head.parameters())
     for attr in ("year_proj", "ch_emb", "cy_proj", "year_emb", "date_proj"):
         if hasattr(model, attr):
             head_params += list(getattr(model, attr).parameters())
     
-    param_groups.append({"params": head_params, "lr": head_lr})
+    param_groups.append({"params": head_params,     "lr": lr_head})
 
     if hasattr(model, "fusion_transformer"):
         fusion_params = list(model.fusion_transformer.parameters())
         param_groups.append({
             "params": fusion_params,
-            "lr": head_lr,
+            "lr": lr_fusion,   # or a small fraction of lr_body if you prefer
         })
     seen = set()
     for g in param_groups:
-        uniq = [p for p in g["params"] if id(p) not in seen]
-        g["params"] = uniq
-        seen.update(map(id, uniq))
-    optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups, _convert_="all")
+        #uniq = [p for p in g["params"] if id(p) not in seen]
+        #g["params"] = uniq                      # drop dups in-place
+        #seen.update(map(id, uniq))
+        # split into decay vs no_decay
+        decay, no_decay = [], []
+        for p in g["params"]:
+            if id(p) in seen: continue
+            seen.add(id(p))
+            # any 1D param is bias or LayerNorm weight → no decay
+            if p.ndim == 1:
+                no_decay.append(p)
+            else:
+                decay.append(p)
+        # apply your global weight_decay only to decay set
+        wd = cfg.optim.weight_decay
+        g["params"]       = decay
+        g["weight_decay"] = wd
+        if no_decay:
+            param_groups.append({
+                "params": no_decay,
+                "weight_decay": 0.0,
+                "lr":        g["lr"]
+            })
+    optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     
     datamodule = hydra.utils.instantiate(cfg.datamodule)
@@ -211,13 +249,17 @@ def train(cfg):
         for i, batch in enumerate(pbar):
             batch["image"] = batch["image"].to(dev)
             batch["target"] = batch["target"].to(dev).squeeze()
-            preds = model(batch).squeeze()
-            loss = loss_fn(preds, batch["target"])
+            with autocast(device_type="cuda"):
+                preds = model(batch).squeeze()
+                loss = loss_fn(preds, batch["target"])
             if logger is not None:
                 logger.log({"loss": loss.detach().cpu().numpy()})
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            #loss.backward()
+            #optimizer.step()
             if cfg.use_warmup:
                 scheduler.step()
                 if logger is not None:

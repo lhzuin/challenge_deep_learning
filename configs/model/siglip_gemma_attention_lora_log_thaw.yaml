@@ -1,0 +1,53 @@
+defaults:
+  - _self_
+pretrained: webli
+instance:
+  _target_: models.siglip_gemma_attention_lora_log.SigLIPGemmaAttentionLoraLog
+  num_channels: 47
+  head_hidden_dim: 256
+  head_dropout: ${if:${dataset.train_on_log}, 0.2, 0.15}
+  metadata_dropout: 0.3
+  ch_emb_dim: 16
+  year_proj_dim: 8
+  date_proj_dim: 16
+  cy_hidden: 16
+
+name: SIGLIP_GEMMA_ATTENTION_LORA_LOG
+
+
+# Train on log
+num_epochs_phase1: 3
+num_epochs_phase2: 2
+num_epochs_phase3: 2
+num_epochs_phase4: 2
+
+datamodule:
+  batch_size: 32      # your physical per-GPU batch
+  accum_steps: 4      # 32×4 = 128 effective
+
+############ Phase-1 ############
+lr_head_phase1:          5e-6
+lr_meta_phase1:          6e-6        # ↓ from 6e-6
+lr_fusion_phase1:        9e-6
+lr_fusion_phase1_final:  3e-6
+weight_decay_fusion_phase1: 0.002
+
+early_stopping.patience: 3     # give it one “bad” epoch
+
+############ Phase-2 (image LoRA) ############
+lr_image_adapter_phase2: 5e-5  # needs a full order higher than head LR
+weight_decay_image_lora: 0.0   # adapters hate decay
+
+############ Phase-3 (text LoRA) ############
+lr_text_adapter_phase3: 3e-6
+weight_decay_text_lora: 0.0
+
+# Phase 4  – joint fine-tune
+lr_head_phase4:          1e-6
+lr_fusion_phase4:        5e-7
+lr_image_adapter_phase4: 3e-6
+lr_text_adapter_phase4:  2e-7
+lr_meta_phase4:          2e-6
+weight_decay_head_phase4: 0.02
+weight_decay_fusion_phase4: 0.02
+weight_decay_meta_phase4: 0.02
