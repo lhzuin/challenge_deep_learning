@@ -1,0 +1,20 @@
+defaults:
+  - _self_
+pretrained: webli
+instance:
+  _target_: models.siglip_distilbert_lora_class.SigLIPDistilBertLoraClass
+  num_channels: 47
+  head_hidden_dim: 256
+  head_dropout: 0.35
+  metadata_dropout: 0.40
+  proj_dropout: 0.10
+  ch_emb_dim: 16
+  year_proj_dim: 8
+  cy_hidden: 16
+
+name: SIGLIP_DISTILBERT_LORA_CLASS
+
+datamodule:
+  batch_size: 128      # your physical per-GPU batch
+  accum_steps: 1
+

@@ -34,7 +34,7 @@ def get_text_blocks(peft_model):
     # 3) Nothing found → return None
     return None
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.1")
+@hydra.main(config_path="configs", config_name="train_class", version_base="1.1")
 def train(cfg):
     logger = (
         wandb.init(project="challenge_CSC_43M04_EP", name=cfg.experiment_name)
@@ -56,11 +56,6 @@ def train(cfg):
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
     scaler = GradScaler(device="cuda")
     continu=False
-    if continu:# Load the saved state dict
-        checkpoint_path = 'checkpoints/SIGLIP_DISTILBERT_ATTENTION_LORA_2025-05-22_23-15-08.pt'
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
 
     # Configuring Early Stop
     def save_and_exit(*_):
@@ -73,122 +68,21 @@ def train(cfg):
 
     opt_cfg = OmegaConf.to_container(cfg.optim, resolve=True, enum_to_str=True)
     
-    lr_body = opt_cfg.pop("lr_body")
+    lr_class = opt_cfg.pop("lr_class")
 
-    lr_image_adapter =  opt_cfg.pop("lr_image_adapter")  # only image‐LoRA
-    lr_text_adapter = opt_cfg.pop("lr_text_adapter")    # only text‐LoRA (title+summary)
-    lr_head = opt_cfg.pop("lr_head")    # head MLP, year/date/channel embeds, etc.
-    lr_fusion = opt_cfg.pop("lr_fusion")
 
     # ------------------------------------------------------------------ #
     # Build the two parameter groups                                  #
     # ------------------------------------------------------------------ #
-    param_groups = []
-    decay = cfg.layer_decay
-    try :
-        num_blocks = len(model.img_encoder.visual.trunk.blocks)
-        # collect all transformer blocks, assign lr = lr_body * decay**(depth)
-        for depth, module in enumerate(model.img_encoder.visual.trunk.blocks):
-            
-            param_groups.append({
-            "params": module.parameters(),
-            "lr": lr_body * (decay ** (num_blocks - depth - 1))
-            })
-    
-    except AttributeError:
-        num_blocks = len(model.img_encoder1.visual.trunk.blocks)
-        # collect all transformer blocks, assign lr = lr_body * decay**(depth)
-        for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
-            
-            param_groups.append({
-            "params": module.parameters(),
-            "lr": lr_body * (decay ** (num_blocks - depth - 1))
-            })
-
-    # ───────── text blocks for layer-decay LR ─────────
-    text_blocks = get_text_blocks(model.text_encoder)  # your helper
-    if any(p.requires_grad for p in model.text_encoder.base_model.parameters()):
-        num_text_blocks = len(text_blocks)
-        for depth, module in enumerate(text_blocks):
-            layer_lr = lr_body * (decay ** (num_text_blocks - depth - 1))
-            param_groups.append({"params": module.parameters(), "lr": layer_lr})
-    else:
-        print("⚠  text backbone frozen → skipping layer-wise LR groups.")
-
-    # --- collect LoRA adapter parameters at head_lr ---
-    # --- collect image vs text LoRA adapters separately ---
-    img_lora_params = []
-    txt_lora_params = []
-    for name, param in model.named_parameters():
-        if not param.requires_grad or "lora_" not in name:
-            continue
-        if name.startswith("img_encoder") or "img_encoder" in name:
-            img_lora_params.append(param)
-        else:
-            txt_lora_params.append(param)
-
-    if img_lora_params:
-        param_groups.append({"params": img_lora_params, "lr": lr_image_adapter})
-    if txt_lora_params:
-        param_groups.append({"params": txt_lora_params, "lr": lr_text_adapter})
-
-
-    
-    head_params = list(model.head.parameters())
-    # always optimize any of these if they exist:
-    for attr in ("year_proj","ch_emb","cy_proj","year_emb","date_proj"):
-        if hasattr(model, attr):
-            head_params += list(getattr(model, attr).parameters())
-    
-    param_groups.append({"params": head_params,     "lr": lr_head})
-
-    # after adapter_params and head_params...
-    if hasattr(model, "fusion_transformer"):
-        fusion_params = list(model.fusion_transformer.parameters())
-        param_groups.append({
-            "params": fusion_params,
-            "lr": lr_fusion,   # or a small fraction of lr_body if you prefer
-        })
-    seen = set()
-    for g in param_groups:
-        #uniq = [p for p in g["params"] if id(p) not in seen]
-        #g["params"] = uniq                      # drop dups in-place
-        #seen.update(map(id, uniq))
-        # split into decay vs no_decay
-        decay, no_decay = [], []
-        for p in g["params"]:
-            if id(p) in seen: continue
-            seen.add(id(p))
-            # any 1D param is bias or LayerNorm weight → no decay
-            if p.ndim == 1:
-                no_decay.append(p)
-            else:
-                decay.append(p)
-        # apply your global weight_decay only to decay set
-        wd = cfg.optim.weight_decay
-        g["params"]       = decay
-        g["weight_decay"] = wd
-        if no_decay:
-            param_groups.append({
-                "params": no_decay,
-                "weight_decay": 0.0,
-                "lr":        g["lr"]
-            })
+    param_groups = [{"params":model.parameters(),   "lr": lr_class, "weight_decay": 0.0}]
+        
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     train_loader = datamodule.train_dataloader()
     val_loader   = datamodule.val_dataloader()
-    train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)
 
-    img_dir = "data/centroids"  # Path to the directory containing images
-    img_files = [f for f in os.listdir(img_dir) if f.lower().endswith('.jpg')]
-    transfo=torch.zeros(len(img_files), 1,3, 224, 224)
-    for i,fname in enumerate(img_files):
-        #img = Image.open(os.path.join(img_dir, fname)).convert('L').resize((64, 64))  # grayscale, 64x64
-        img = Image.open(os.path.join(img_dir, fname)).convert('RGB')  # full hd
-        transfo[i]= train_transform(img).unsqueeze(0)
-    torch.save(transfo,'data/transformed_centroids.pt')
+
 
     # ── cosine-with-warmup scheduler ───────────────────────────
     if cfg.use_warmup:
@@ -233,10 +127,10 @@ def train(cfg):
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}", leave=False)
         for i, batch in enumerate(pbar):
             batch["image"] = batch["image"].to(device)
-            batch["target"] = batch["target"].to(device).squeeze()
+            batch["label"] = batch["label"].to(device)
             with autocast(device_type="cuda"):
-                preds = model(batch).squeeze()
-                loss = loss_fn(preds, batch["target"])
+                logits = model(batch)            # [B,3]
+                loss = loss_fn(logits, batch["label"])
             (
                 logger.log({"loss": loss.detach().cpu().numpy()})
                 if logger is not None
@@ -277,8 +171,8 @@ def train(cfg):
                 batch["image"] = batch["image"].to(device)
                 batch["target"] = batch["target"].to(device).squeeze()
                 with torch.no_grad():
-                    preds = model(batch).squeeze()
-                loss = loss_fn(preds, batch["target"])
+                    logits = model(batch)            # [B,3]
+                loss = loss_fn(logits, batch["label"].to(device))
                 epoch_val_loss += loss.detach().cpu().numpy() * len(batch["image"])
                 num_samples_val += len(batch["image"])
             epoch_val_loss /= num_samples_val

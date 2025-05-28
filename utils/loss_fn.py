@@ -31,7 +31,7 @@ class MSLELoss(nn.Module):
         y_pred = torch.clamp(y_pred, min=0)
         y_true = torch.clamp(y_true, min=0)
 
-        # Compute the RMSLE
+        # Compute the MSLE
         log_pred = torch.log1p(y_pred)
         log_true = torch.log1p(y_true)
         loss = torch.mean((log_pred - log_true) ** 2)

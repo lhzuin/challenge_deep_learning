@@ -4,11 +4,11 @@ version_base: 1.1
 defaults:
     - _self_
     - dataset: default
-    - optim: adamw_normal
-    - model: siglip_gemma_attention_lora_log
-    - loss_fn: msle # Change for msle if not log or mse if log
+    - optim: adamw_class
+    - model: siglip_distilbert_lora_class
+    - loss_fn: cross_entropy
 
-epochs: 9 #50 / 35
+epochs: 2 #50 / 35
 
 
 early_stopping:
