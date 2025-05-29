@@ -171,20 +171,11 @@ def train(cfg):
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     # if training a regressor, only keep samples of that class
     if cfg.class_filter is not None:
-        ds = datamodule.train_set  # this is a Subset
-        # gather only indices whose label == class_filter
-        idxs = [i for i in ds.indices
-                if ds.dataset[i]["label"].item() == cfg.class_filter]
-        datamodule.train_set = torch.utils.data.Subset(ds.dataset, idxs)
-        train_loader = torch.utils.data.DataLoader(
-            datamodule.train_set,
-            batch_size=cfg.batch_size,
-            shuffle=True,
-            num_workers=cfg.num_workers,
-        )
+        train_loader = datamodule.train_dataloader_by_class(cfg.class_filter)
+        val_loader   = datamodule.val_dataloader_by_class(cfg.class_filter)
     else:
         train_loader = datamodule.train_dataloader()
-    val_loader   = datamodule.val_dataloader()
+        val_loader   = datamodule.val_dataloader()
     train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)
 
     img_dir = "data/centroids"  # Path to the directory containing images
@@ -210,19 +201,6 @@ def train(cfg):
         )
 
 
-
-    # -- sanity check
-    train_sanity = show_images(train_loader, name="assets/sanity/train_images")
-    (
-        logger.log({"sanity_checks/train_images": wandb.Image(train_sanity)})
-        if logger is not None
-        else None
-    )
-    if val_loader is not None:
-        val_sanity = show_images(val_loader, name="assets/sanity/val_images")
-        logger.log(
-            {"sanity_checks/val_images": wandb.Image(val_sanity)}
-        ) if logger is not None else None
 
     best_val_loss = float("inf")
     epochs_since_improve = 0
@@ -304,7 +282,7 @@ def train(cfg):
             if epoch_val_loss < best_val_loss:
                 best_val_loss = epoch_val_loss
                 epochs_since_improve = 0
-                torch.save(model.state_dict(), cfg.checkpoint_path)
+                torch.save(model.state_dict(), cfg.checkpoint_path )
                 print(f"[Epoch {epoch:02d}] New best val loss: {best_val_loss:.4f} (saved)")
             else:
                 epochs_since_improve += 1

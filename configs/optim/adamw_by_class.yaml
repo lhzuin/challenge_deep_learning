@@ -1,7 +1,6 @@
 _target_: torch.optim.AdamW
-lr_head: ${if:${dataset.train_on_log}, 2e-4, 4e-3}       # rapide
-lr_body: ${if:${dataset.train_on_log}, 2e-6, 2e-5}        # lent
-
+lr_body: 2e-6      # lent
+lr_head: 5e-5
 lr_image_adapter: 2e-6    # only image‐LoRA
 lr_text_adapter: 2e-6    # only text‐LoRA (title+summary)
 #lr_head: 5e-5    # head MLP, year/date/channel embeds, etc.
