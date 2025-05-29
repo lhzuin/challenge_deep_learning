@@ -65,6 +65,7 @@ class SigLIPDistilBertLoraClass(nn.Module):
         for name, p in self.text_encoder.base_model.named_parameters():
             if "lora_" not in name:
                 p.requires_grad = False
+
         
         bert_dim = self.text_encoder.config.hidden_size
 
@@ -79,13 +80,13 @@ class SigLIPDistilBertLoraClass(nn.Module):
         self.img_proj     = nn.Linear(clip_dim, D)
 
         # ── continuous year MLP ─────────────────────────────────
+
         self.year_proj = nn.Sequential(
             nn.Linear(1, year_proj_dim),
             nn.ReLU(),
             nn.Dropout(metadata_dropout),
             nn.LayerNorm(year_proj_dim),
         )
-   
 
         # ── channel×year interaction ────────────────────────────
        
@@ -117,11 +118,17 @@ class SigLIPDistilBertLoraClass(nn.Module):
             nn.Linear(head_hidden_dim, 3),
             #nn.Softmax() 
         )
-
+        
         for name, p in self.named_parameters():
-            if not name.startswith("head"):
+            if not (name.startswith("head") and ("lora_" in name)):
                 p.requires_grad = False
 
+        for name, p in self.named_parameters():
+            # only the classifier head and any lora_ modules should stay trainable
+            if name.startswith("head") or "lora_" in name:
+                p.requires_grad = True
+            else:
+                p.requires_grad = False
     # ------------------------------------------------------------------ #
     # forward                                                            #
     # ------------------------------------------------------------------ #

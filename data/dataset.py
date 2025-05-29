@@ -176,9 +176,9 @@ class Dataset(torch.utils.data.Dataset):
         # build a 3-way label via ±2σ on the log-view
         raw_views = self.targets[idx] if not self.train_on_log else np.expm1(self.targets[idx])
         l = math.log(raw_views + 1)
-        if   l < self.mu - 2*self.sigma:
+        if   l < self.mu - self.sigma:
             label = 0   # low
-        elif l > self.mu + 2*self.sigma:
+        elif l > self.mu + 0.5*self.sigma:
             label = 2   # high
         else:
             label = 1   # normal
