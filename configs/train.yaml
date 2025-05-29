@@ -4,7 +4,7 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw_log
-    - model: img12_distilbert_attention_lora #siglip_gemma_attention_lora
+    - model: resnet_distilbert_lora  #siglip_distilbert_lora #resnet_distilbert_lora #siglip_distilbert_lora #img12_distilbert_attention_lora #siglip_gemma_attention_lora
     - loss_fn: mse
 
 epochs: 10 #50 / 35
@@ -40,7 +40,7 @@ datamodule:
   train_on_log: ${dataset.train_on_log}
   augmentation: ${dataset.augmentation}
   num_epochs: ${epochs}
-  planification: "outliers"
+  planification: "same_champion" #"outliers"
 
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}

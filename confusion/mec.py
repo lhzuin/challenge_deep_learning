@@ -33,7 +33,7 @@ def mec(cfg_model):
             preds = model(batch).squeeze().cpu().numpy()
             # Ensure batch["label"] is on CPU and numpy
             true_labels = np.int16(np.log(batch["target"].squeeze().cpu().numpy()))
-            pred_labels = np.int16(np.log(preds))
+            pred_labels = np.int16(preds-1)
             confusion_mat.update(true_labels, pred_labels)
 
     confusion_mat.print_matrix(save_path=f'confusion/confusion_matrix/{cfg_model.model.name}{cfg_model.time_stamp}confusion_matrix.png')

@@ -53,6 +53,8 @@ class DataModule:
             self._create_epoque(self.epoch, validation=False)
         elif build == "outliers":
             self._create_outlier(self.epoch, validation=True)
+        elif build == "outliers_champ":
+            self._create_outlier(self.epoch, validation=False)
         else:
             raise ValueError(f"Unknown build type: {build}")
 
@@ -65,15 +67,15 @@ class DataModule:
             train_on_log = self.train_on_log
         )
         if epoch == 0:
-            base = base.subset((base.info["year"] >= 2020).to_numpy().nonzero()[0])
+            base = base.subset((base.info["year"] >= 2020+2*(1-validation)).to_numpy().nonzero()[0])
         elif epoch <= 3:
             if self.train_on_log:
-                mask=np.abs(base.info["views"] -10 )>3
+                mask=(base.info["views"] -10 <-3) |( base.info["views"] -10 >3)
             else:
-                mask=np.abs(np.log1p(base.info["views"]) - 10) > 3
-            base = base.subset(((base.info["year"] >= 2020) | mask).to_numpy().nonzero()[0])
+                mask=(np.log1p(base.info["views"]) - 10  <-3) |( np.log1p(base.info["views"]) - 10 >2)
+            base = base.subset(((base.info["year"] >= 2020+2*(1-validation)) | mask).to_numpy().nonzero()[0])
         
-        val_row_mask = (base.info["year"] >= 2022) & (base.info["aug"] == 0)
+        val_row_mask = (base.info["year"] >= 2022+5*(1-validation)) & (base.info["aug"] == 0)
         val_ids = set(base.info.loc[val_row_mask, "id"])
         full = RandomPerIdDataset(
             base_dataset = base,
@@ -124,7 +126,7 @@ class DataModule:
         if self.augmentation:
             full = RandomPerIdDataset(base, mix_fields=("title", "summary"))
             originals = base.info.query("aug == 0")
-            all_ids = originals["base_id"].unique().tolist()
+            all_ids = originals["id"].unique().tolist()
             rng = random.Random(self.seed)
             rng.shuffle(all_ids)
             val_len = int(self.val_ratio * len(all_ids))
@@ -164,7 +166,7 @@ class DataModule:
                 mix_fields   = ("title", "summary"),
             )
             val_row_mask = (base.info["year"] >= 2022) & (base.info["aug"] == 0)
-            val_ids = set(base.info.loc[val_row_mask, "base_id"])
+            val_ids = set(base.info.loc[val_row_mask, "id"])
             train_idx, val_idx = [], []
             for i, bid in enumerate(full.base_ids):
                 (val_idx if bid in val_ids else train_idx).append(i)
@@ -190,7 +192,7 @@ class DataModule:
             full = RandomPerIdDataset(base, mix_fields=("title", "summary"))
             originals = base.info.query("aug == 0").reset_index()
             champ_row = originals.sample(n=1, random_state=self.seed).iloc[0]
-            champ_id = champ_row["base_id"]
+            champ_id = champ_row["id"]
             champ_csv_idx = [int(champ_row["index"])]
             train_idx = [i for i, bid in enumerate(full.base_ids) if bid != champ_id]
             self.train_set = Subset(full, train_idx)
@@ -365,6 +367,21 @@ class ConcatDataModule():
                     self.val_ratio,
                     self.seed,
                     build="outliers",
+                    epoch=i,
+                    augmentation=self.augmentation,
+                    train_on_log=self.train_on_log
+                ) for i in range(self.num_epochs)]
+            elif planification == "outliers_champ":
+                self.planification = [DataModule(
+                    self.dataset_path,
+                    self.train_transform,
+                    self.test_transform,
+                    self.batch_size,
+                    self.num_workers,
+                    self.metadata,
+                    self.val_ratio,
+                    self.seed,
+                    build="outliers_champ",
                     epoch=i,
                     augmentation=self.augmentation,
                     train_on_log=self.train_on_log

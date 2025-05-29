@@ -1,5 +1,11 @@
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # ← AJOUTE CETTE LIGNE
+
+from PIL import Image
+import wandb
+import hydra
 from torch import cuda, device as torch_device, save as torch_save, no_grad, zeros
-from torch import Tensor
+from torch import Tensor,save
 from torch.cuda import empty_cache, ipc_collect
 from torch.nn import Module
 from torch.utils.data import DataLoader
@@ -11,9 +17,6 @@ from utils.sanity import show_images
 import signal
 import sys
 import os
-from PIL import Image
-import wandb
-import hydra
 
 def get_text_blocks(peft_model):
     """
@@ -91,12 +94,26 @@ def train(cfg):
             })
     
     except AttributeError:
-        num_blocks = len(model.img_encoder1.visual.trunk.blocks)
-        for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
-            param_groups.append({
+        try :
+            num_blocks = len(model.img_encoder1.visual.trunk.blocks)
+            for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
+                param_groups.append({
                 "params": module.parameters(),
                 "lr": body_lr * (decay ** (num_blocks - depth - 1))
             })
+        except AttributeError:
+            resnet_layers = [
+                model.img_encoder.layer1,
+                model.img_encoder.layer2,
+                model.img_encoder.layer3,
+                model.img_encoder.layer4,
+            ]
+            num_blocks = len(resnet_layers)
+            for depth, module in enumerate(resnet_layers):
+                param_groups.append({
+                    "params": module.parameters(),
+                    "lr": body_lr * (decay ** (num_blocks - depth - 1))
+                })
 
     # ───────── text blocks for layer-decay LR ─────────
     text_blocks = get_text_blocks(model.text_encoder)

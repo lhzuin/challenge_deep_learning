@@ -1,12 +1,7 @@
 defaults:
     - _self_
     - dataset: default
-<<<<<<< HEAD
-    - model: siglip_gemma_attention_lora
-
-=======
-    - model: img12_distilbert_attention_lora
->>>>>>> 27a24ec (planification)
+    - model: resnet_distilbert_lora #siglip_distilbert_lora # # img12_distilbert_attention_lora #_gemma_attention_lora
 hydra:
   output_subdir: null
   run:
@@ -22,11 +17,7 @@ data:
 
 data_dir: ${root_dir}/dataset/
 prefix: ""
-<<<<<<< HEAD
-time_stamp: 2025-05-24_21-11-40
-=======
-time_stamp: 2025-05-24_23-33-42
->>>>>>> 27a24ec (planification)
+time_stamp: 2025-05-29_15-32-41
 
 experiment_name: ${prefix}${model.name}_${time_stamp}
 root_dir:  ${hydra:runtime.cwd}
