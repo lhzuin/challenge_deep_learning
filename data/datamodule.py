@@ -3,6 +3,7 @@ import numpy as np
 import random
 from data.random_per_id import RandomPerIdDataset
 import torch
+from torch.utils.data import WeightedRandomSampler
 
 from data.dataset import Dataset
 
@@ -34,8 +35,8 @@ class DataModule:
         self.train_on_log = train_on_log
         self.augmentation = augmentation
         # build the two subsets exactly once
-        self._create_split_newest()
-        #self._create_champion()
+        #self._create_split_newest()
+        self._create_champion()
         #self._create_split()
 
     def _create_split(self):
@@ -191,4 +192,44 @@ class DataModule:
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
+        )
+    
+
+    def train_class_dataloader(self):
+        # 1) build the flat list of true labels for every index in self.train_set
+        all_labels = []
+        # self.train_set is a Subset, so .indices gives the underlying Dataset indices
+        base_ds = self.train_set.dataset
+        for idx in self.train_set.indices:
+            # your Dataset.__getitem__ already attaches "label" as torch.long
+            lab = base_ds[idx]["label"].item()
+            all_labels.append(lab)
+        all_labels = np.array(all_labels, dtype=np.int64)
+
+        # 2) count and desired proportions
+        counts    = np.bincount(all_labels, minlength=3).astype(np.float32)
+        desired_p = np.array([0.25, 0.50, 0.25], dtype=np.float32)
+        # if you wanted "normal" exactly twice low/high in absolute terms:
+        # desired_p = np.array([1.0, 2.0, 1.0], dtype=np.float32)
+        # desired_p /= desired_p.sum()
+
+        # 3) per-class weight = desired_p[c] / counts[c]
+        class_weights = desired_p / counts
+        # 4) per-sample weights
+        sample_weights = class_weights[all_labels]
+
+        # 5) sampler
+        sampler = WeightedRandomSampler(
+            weights     = sample_weights,
+            num_samples = len(sample_weights),
+            replacement = True
+        )
+
+        # 6) DataLoader with sampler (drop shuffle!)
+        return DataLoader(
+            self.train_set,
+            batch_size  = self.batch_size,
+            sampler     = sampler,
+            num_workers = self.num_workers,
+            pin_memory  = True,
         )

@@ -34,7 +34,7 @@ def get_text_blocks(peft_model):
     # 3) Nothing found → return None
     return None
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.1")
+@hydra.main(config_path="configs", config_name="train_by_class", version_base="1.1")
 def train(cfg):
     logger = (
         wandb.init(project="challenge_CSC_43M04_EP", name=cfg.experiment_name)
@@ -50,17 +50,9 @@ def train(cfg):
     
     print(f"🏃‍♂️ Training process PID = {os.getpid()}")
     print(f"To early stop, do: kill -SIGUSR1 {os.getpid()}")
-
-    # Instantiate model and loss
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
-    model = hydra.utils.instantiate(cfg.model.instance).to(device)
+    model   = hydra.utils.instantiate(cfg.model.instance).to(device)
     scaler = GradScaler(device="cuda")
-    continu=False
-    if continu:# Load the saved state dict
-        checkpoint_path = 'checkpoints/SIGLIP_DISTILBERT_ATTENTION_LORA_2025-05-22_23-15-08.pt'
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
 
     # Configuring Early Stop
     def save_and_exit(*_):
@@ -177,7 +169,21 @@ def train(cfg):
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     datamodule = hydra.utils.instantiate(cfg.datamodule)
-    train_loader = datamodule.train_dataloader()
+    # if training a regressor, only keep samples of that class
+    if cfg.class_filter is not None:
+        ds = datamodule.train_set  # this is a Subset
+        # gather only indices whose label == class_filter
+        idxs = [i for i in ds.indices
+                if ds.dataset[i]["label"].item() == cfg.class_filter]
+        datamodule.train_set = torch.utils.data.Subset(ds.dataset, idxs)
+        train_loader = torch.utils.data.DataLoader(
+            datamodule.train_set,
+            batch_size=cfg.batch_size,
+            shuffle=True,
+            num_workers=cfg.num_workers,
+        )
+    else:
+        train_loader = datamodule.train_dataloader()
     val_loader   = datamodule.val_dataloader()
     train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)
 
@@ -258,6 +264,7 @@ def train(cfg):
             pbar.set_postfix({"train/loss_step": loss.detach().cpu().numpy()})
         epoch_train_loss /= num_samples_train
         print(f"[Epoch {epoch:02d}] Training loss: {epoch_train_loss:.4f}")
+
         if logger is not None:
             logger.log(
                 {

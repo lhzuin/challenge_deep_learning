@@ -5,6 +5,8 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
 from torch.amp import autocast, GradScaler
+from torch.utils.data import WeightedRandomSampler
+import numpy as np
 
 from utils.sanity import show_images
 import signal, sys
@@ -52,10 +54,8 @@ def train(cfg):
     print(f"To early stop, do: kill -SIGUSR1 {os.getpid()}")
 
     # Instantiate model and loss
-    loss_fn = hydra.utils.instantiate(cfg.loss_fn)
     model = hydra.utils.instantiate(cfg.model.instance).to(device)
     scaler = GradScaler(device="cuda")
-    continu=False
 
     # Configuring Early Stop
     def save_and_exit(*_):
@@ -69,18 +69,31 @@ def train(cfg):
     opt_cfg = OmegaConf.to_container(cfg.optim, resolve=True, enum_to_str=True)
     
     lr_class = opt_cfg.pop("lr_class")
+    lr_lora = opt_cfg.pop("lr_lora")
 
 
     # ------------------------------------------------------------------ #
     # Build the two parameter groups                                  #
     # ------------------------------------------------------------------ #
-    param_groups = [{"params":model.parameters(),   "lr": lr_class, "weight_decay": 0.0}]
+    lora_params = [
+        p for n, p in model.named_parameters()
+        if p.requires_grad and "lora_" in n
+    ]
+
+    head_params = [
+        p for n, p in model.named_parameters()
+        if p.requires_grad and "lora_" not in n
+    ]
+    param_groups = [{"params":head_params,   "lr": lr_class, "weight_decay": 0.01}, {"params":lora_params,   "lr": lr_lora, "weight_decay": 0.0}]
+    
         
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
     datamodule = hydra.utils.instantiate(cfg.datamodule)
-    train_loader = datamodule.train_dataloader()
+    train_loader = datamodule.train_class_dataloader()
     val_loader   = datamodule.val_dataloader()
+
+    loss_fn = hydra.utils.instantiate(cfg.loss_fn)
 
 
 
@@ -151,6 +164,8 @@ def train(cfg):
             num_samples_train += len(batch["image"])
             pbar.set_postfix({"train/loss_step": loss.detach().cpu().numpy()})
         epoch_train_loss /= num_samples_train
+
+        print(f"[Epoch {epoch:02d}] Training loss: {epoch_train_loss:.4f}")
 
         if logger is not None:
             logger.log(

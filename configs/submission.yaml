@@ -1,7 +1,7 @@
 defaults:
     - _self_
     - dataset: default
-    - model: siglip_gemma_attention_lora_log
+    - model: siglip_distilbert_lora_class
 
 hydra:
   output_subdir: null
@@ -18,7 +18,7 @@ data:
 
 data_dir: ${root_dir}/dataset/
 prefix: ""
-time_stamp: 2025-05-27_22-46-30
+time_stamp: 2025-05-29_13-28-20
 
 experiment_name: ${prefix}${model.name}_${time_stamp}
 root_dir:  ${hydra:runtime.cwd}
