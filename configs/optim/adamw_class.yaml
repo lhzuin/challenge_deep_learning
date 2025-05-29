@@ -1,5 +1,6 @@
 _target_: torch.optim.AdamW
-lr_class: 3e-4
+lr_class: 1e-4
+lr_lora: 5e-6
 
 
 weight_decay: 0.01

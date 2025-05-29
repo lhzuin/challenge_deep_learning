@@ -1,24 +1,17 @@
-import os
-os.environ["TOKENIZERS_PARALLELISM"] = "false"  # ← AJOUTE CETTE LIGNE
-
-from PIL import Image
+import torch
 import wandb
 import hydra
-from torch import cuda, device as torch_device, save as torch_save, no_grad, zeros
-from torch import Tensor,save
-from torch.cuda import empty_cache, ipc_collect
-from torch.nn import Module
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
-import numpy as np
 from torch.amp import autocast, GradScaler
 
 from utils.sanity import show_images
-import signal
-import sys
+import signal, sys
 import os
+from PIL import Image
+
+OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 def get_text_blocks(peft_model):
     """
@@ -41,34 +34,25 @@ def get_text_blocks(peft_model):
     # 3) Nothing found → return None
     return None
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.1")
+@hydra.main(config_path="configs", config_name="train_by_class", version_base="1.1")
 def train(cfg):
     logger = (
         wandb.init(project="challenge_CSC_43M04_EP", name=cfg.experiment_name)
         if cfg.log
         else None
     )
-    if cuda.is_available():
-        dev = torch_device("cuda")
-    elif hasattr(cuda, "backends") and hasattr(cuda.backends, "mps") and cuda.backends.mps.is_available():
-        dev = torch_device("mps")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
     else:
-        dev = torch_device("cpu")
+        device = torch.device("cpu")
     
     print(f"🏃‍♂️ Training process PID = {os.getpid()}")
     print(f"To early stop, do: kill -SIGUSR1 {os.getpid()}")
-
-    # Instantiate model and loss
     loss_fn = hydra.utils.instantiate(cfg.loss_fn)
-    model = hydra.utils.instantiate(cfg.model.instance).to(dev)
-    continu = False
+    model   = hydra.utils.instantiate(cfg.model.instance).to(device)
     scaler = GradScaler(device="cuda")
-    continu=False
-    if continu:# Load the saved state dict
-        checkpoint_path = 'checkpoints/SIGLIP_DISTILBERT_ATTENTION_LORA_2025-05-22_23-15-08.pt'
-        empty_cache()
-        ipc_collect()
-        model.load_state_dict(torch_save(checkpoint_path, map_location=dev))
 
     # Configuring Early Stop
     def save_and_exit(*_):
@@ -93,41 +77,28 @@ def train(cfg):
     # ------------------------------------------------------------------ #
     param_groups = []
     decay = cfg.layer_decay
-    try:
+    try :
         num_blocks = len(model.img_encoder.visual.trunk.blocks)
         # collect all transformer blocks, assign lr = lr_body * decay**(depth)
         for depth, module in enumerate(model.img_encoder.visual.trunk.blocks):
+            
             param_groups.append({
             "params": module.parameters(),
             "lr": lr_body * (decay ** (num_blocks - depth - 1))
             })
     
     except AttributeError:
-        try:
-            num_blocks = len(model.img_encoder1.visual.trunk.blocks)
-            # collect all transformer blocks, assign lr = lr_body * decay**(depth)
-            for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
-                
-                param_groups.append({
-                "params": module.parameters(),
-                "lr": lr_body * (decay ** (num_blocks - depth - 1))
-                })
-        except AttributeError:
-            resnet_layers = [
-                model.img_encoder.layer1,
-                model.img_encoder.layer2,
-                model.img_encoder.layer3,
-                model.img_encoder.layer4,
-            ]
-            num_blocks = len(resnet_layers)
-            for depth, module in enumerate(resnet_layers):
-                param_groups.append({
-                    "params": module.parameters(),
-                    "lr": body_lr * (decay ** (num_blocks - depth - 1))
-                })
+        num_blocks = len(model.img_encoder1.visual.trunk.blocks)
+        # collect all transformer blocks, assign lr = lr_body * decay**(depth)
+        for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
+            
+            param_groups.append({
+            "params": module.parameters(),
+            "lr": lr_body * (decay ** (num_blocks - depth - 1))
+            })
 
     # ───────── text blocks for layer-decay LR ─────────
-    text_blocks = get_text_blocks(model.text_encoder)
+    text_blocks = get_text_blocks(model.text_encoder)  # your helper
     if any(p.requires_grad for p in model.text_encoder.base_model.parameters()):
         num_text_blocks = len(text_blocks)
         for depth, module in enumerate(text_blocks):
@@ -154,13 +125,16 @@ def train(cfg):
         param_groups.append({"params": txt_lora_params, "lr": lr_text_adapter})
 
 
+    
     head_params = list(model.head.parameters())
-    for attr in ("year_proj", "ch_emb", "cy_proj", "year_emb", "date_proj"):
+    # always optimize any of these if they exist:
+    for attr in ("year_proj","ch_emb","cy_proj","year_emb","date_proj"):
         if hasattr(model, attr):
             head_params += list(getattr(model, attr).parameters())
     
     param_groups.append({"params": head_params,     "lr": lr_head})
 
+    # after adapter_params and head_params...
     if hasattr(model, "fusion_transformer"):
         fusion_params = list(model.fusion_transformer.parameters())
         param_groups.append({
@@ -194,66 +168,86 @@ def train(cfg):
             })
     optimizer = hydra.utils.instantiate(opt_cfg, params=param_groups,_convert_="all")
     # ── dataloaders ────────────────────────────────────────────
-    
     datamodule = hydra.utils.instantiate(cfg.datamodule)
-    datamodule_planification = datamodule.planification
-    
+    # if training a regressor, only keep samples of that class
+    if cfg.class_filter is not None:
+        ds = datamodule.train_set  # this is a Subset
+        # gather only indices whose label == class_filter
+        idxs = [i for i in ds.indices
+                if ds.dataset[i]["label"].item() == cfg.class_filter]
+        datamodule.train_set = torch.utils.data.Subset(ds.dataset, idxs)
+        train_loader = torch.utils.data.DataLoader(
+            datamodule.train_set,
+            batch_size=cfg.batch_size,
+            shuffle=True,
+            num_workers=cfg.num_workers,
+        )
+    else:
+        train_loader = datamodule.train_dataloader()
+    val_loader   = datamodule.val_dataloader()
     train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)
 
-    img_dir = "data/centroids"
+    img_dir = "data/centroids"  # Path to the directory containing images
     img_files = [f for f in os.listdir(img_dir) if f.lower().endswith('.jpg')]
-    transfo = zeros(len(img_files), 1, 3, 224, 224)
-    for i, fname in enumerate(img_files):
-        img = Image.open(os.path.join(img_dir, fname)).convert('RGB')
-        transfo[i] = train_transform(img).unsqueeze(0)
-    torch_save(transfo, 'data/transformed_centroids.pt')
+    transfo=torch.zeros(len(img_files), 1,3, 224, 224)
+    for i,fname in enumerate(img_files):
+        #img = Image.open(os.path.join(img_dir, fname)).convert('L').resize((64, 64))  # grayscale, 64x64
+        img = Image.open(os.path.join(img_dir, fname)).convert('RGB')  # full hd
+        transfo[i]= train_transform(img).unsqueeze(0)
+    torch.save(transfo,'data/transformed_centroids.pt')
 
     # ── cosine-with-warmup scheduler ───────────────────────────
     if cfg.use_warmup:
-       
-        total_steps = sum([
-                len(loader) for loader in datamodule_planification]
-            ) 
+        num_epochs      = cfg.epochs
+        num_batches     = len(train_loader)
+        total_steps     = num_epochs * num_batches
         num_warmup_steps = int(total_steps * cfg.warmup_fraction)
 
         scheduler = get_cosine_schedule_with_warmup(
             optimizer,
             num_warmup_steps=num_warmup_steps,
-            num_training_steps=total_steps
+            num_training_steps=total_steps,
         )
 
+
+
     # -- sanity check
-    if cfg.sanity_check.enabled:
-        train_loader = datamodule_planification[0]
-        val_loader = datamodule_planification[0] if len(datamodule_planification) > 1 else None
-    
-        train_sanity = show_images(train_loader, name="assets/sanity/train_images")
-        if logger is not None:
-            logger.log({"sanity_checks/train_images": wandb.Image(train_sanity)})
-        if val_loader is not None and logger is not None:
-            val_sanity = show_images(val_loader, name="assets/sanity/val_images")
-            logger.log({"sanity_checks/val_images": wandb.Image(val_sanity)})
+    train_sanity = show_images(train_loader, name="assets/sanity/train_images")
+    (
+        logger.log({"sanity_checks/train_images": wandb.Image(train_sanity)})
+        if logger is not None
+        else None
+    )
+    if val_loader is not None:
+        val_sanity = show_images(val_loader, name="assets/sanity/val_images")
+        logger.log(
+            {"sanity_checks/val_images": wandb.Image(val_sanity)}
+        ) if logger is not None else None
 
     best_val_loss = float("inf")
     epochs_since_improve = 0
     patience = cfg.early_stopping.patience
     min_epochs = cfg.early_stopping.min_epochs
+    # -- loop over epochs
     for epoch in tqdm(range(cfg.epochs), desc="Epochs"):
-        train_loader = datamodule_planification[epoch]
         if hasattr(train_loader.dataset, "set_epoch"):
             train_loader.dataset.set_epoch(epoch)
+        # -- loop over training batches
         model.train()
         epoch_train_loss = 0
         num_samples_train = 0
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}", leave=False)
         for i, batch in enumerate(pbar):
-            batch["image"] = batch["image"].to(dev)
-            batch["target"] = batch["target"].to(dev).squeeze()
+            batch["image"] = batch["image"].to(device)
+            batch["target"] = batch["target"].to(device).squeeze()
             with autocast(device_type="cuda"):
                 preds = model(batch).squeeze()
                 loss = loss_fn(preds, batch["target"])
-            if logger is not None:
+            (
                 logger.log({"loss": loss.detach().cpu().numpy()})
+                if logger is not None
+                else None
+            )
             optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -270,38 +264,47 @@ def train(cfg):
             pbar.set_postfix({"train/loss_step": loss.detach().cpu().numpy()})
         epoch_train_loss /= num_samples_train
         print(f"[Epoch {epoch:02d}] Training loss: {epoch_train_loss:.4f}")
+
         if logger is not None:
-            logger.log({
-                "epoch": epoch,
-                "train/loss_epoch": epoch_train_loss,
-            })
+            logger.log(
+                {
+                    "epoch": epoch,
+                    "train/loss_epoch": epoch_train_loss,
+                }
+            )
+
 
         # -- validation loop
         val_metrics = {}
         epoch_val_loss = 0
         num_samples_val = 0
         model.eval()
-        val_loader = datamodule.val
-        if val_loader is not None:
+        if val_loader is not None: 
             for _, batch in enumerate(val_loader):
-                batch["image"] = batch["image"].to(dev)
-                batch["target"] = batch["target"].to(dev).squeeze()
-                with no_grad():
+                batch["image"] = batch["image"].to(device)
+                batch["target"] = batch["target"].to(device).squeeze()
+                with torch.no_grad():
                     preds = model(batch).squeeze()
                 loss = loss_fn(preds, batch["target"])
                 epoch_val_loss += loss.detach().cpu().numpy() * len(batch["image"])
                 num_samples_val += len(batch["image"])
             epoch_val_loss /= num_samples_val
             val_metrics["val/loss_epoch"] = epoch_val_loss
-            if logger is not None:
-                logger.log({
-                    "epoch": epoch,
-                    **val_metrics,
-                })
+            (
+                logger.log(
+                    {
+                        "epoch": epoch,
+                        **val_metrics,
+                    }
+                )
+                if logger is not None
+                else None
+            )
+            # ––– check for improvement –––
             if epoch_val_loss < best_val_loss:
                 best_val_loss = epoch_val_loss
                 epochs_since_improve = 0
-                torch_save(model.state_dict(), cfg.checkpoint_path)
+                torch.save(model.state_dict(), cfg.checkpoint_path)
                 print(f"[Epoch {epoch:02d}] New best val loss: {best_val_loss:.4f} (saved)")
             else:
                 epochs_since_improve += 1
@@ -311,7 +314,7 @@ def train(cfg):
                     break
         
         if hasattr(model, "epoch_scheduler_hook"):
-            model.epoch_scheduler_hook()
+            model.epoch_scheduler_hook() 
 
     print(
         f"""Epoch {epoch}: 
@@ -324,7 +327,7 @@ def train(cfg):
     if cfg.log:
         logger.finish()
 
-    torch_save(model.state_dict(), cfg.checkpoint_path)
+    torch.save(model.state_dict(), cfg.checkpoint_path)
 
 
 if __name__ == "__main__":
