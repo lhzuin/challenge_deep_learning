@@ -1,0 +1,9 @@
+defaults:
+  - datamodule: default
+  - model:    siglip_distilbert_lora
+  - loss_fn:  mse       # or msle, matching how you trained your regressors
+
+# paths to your three per-class checkpoints
+ckpt_dir: checkpoints
+# classifier checkpoint (outputs class probabilities)
+ckpt_class: checkpoints/SIGLIP_DISTILBERT_LORA_CLASS_final.pt

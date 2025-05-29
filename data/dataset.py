@@ -174,7 +174,7 @@ class Dataset(torch.utils.data.Dataset):
                 value["target"] = torch.tensor(self.targets[idx], dtype=torch.float32)
 
         # build a 3-way label via ±2σ on the log-view
-        raw_views = self.targets[idx] if not self.train_on_log else np.expm1(self.targets[idx])
+        raw_views = self.targets[idx]
         l = math.log(raw_views + 1)
         if   l < self.mu - self.sigma:
             label = 0   # low

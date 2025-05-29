@@ -275,6 +275,74 @@ class DataModule:
             num_workers = self.num_workers,
             pin_memory  = True,
         )
+    
+    def train_dataloader_by_class(self, class_filter):
+        """
+        If class_filter is None, returns the vanilla shuffle DataLoader.
+        Otherwise filters to only those base‐IDs whose 3‐way label == class_filter,
+        and returns a rebalanced sampler DataLoader.
+        """
+        from torch.utils.data import Subset, DataLoader, WeightedRandomSampler
+        import math
+
+        class_filter = int(class_filter)
+
+        # 1) get the RandomPerIdDataset wrapper and its base DataFrame
+        full_wrapper: RandomPerIdDataset = self.train_set.dataset
+        base_df = full_wrapper.base.info
+
+        # 2) build base_id → label from the original (aug==0) rows
+        orig = base_df.query("aug == 0")[["base_id", "views"]]
+        mu, sigma = full_wrapper.base.mu, full_wrapper.base.sigma
+        def make_label(v):
+            l = math.log(v + 1)
+            if   l < mu - sigma:     return 0
+            elif l > mu + 0.5*sigma: return 2
+            else:                    return 1
+        label_map = {row.base_id: make_label(row.views) for row in orig.itertuples()}
+
+        # 4) otherwise pick only those indices in full_wrapper.base_ids
+        idxs = [i for i, bid in enumerate(full_wrapper.base_ids)
+                if label_map.get(bid, -1) == class_filter]
+        if len(idxs)==0:
+            raise ValueError(f"No samples for class_filter={class_filter}")
+
+        # 5) build a Subset and sampler to rebalance if you like
+        sub = Subset(full_wrapper, idxs)
+        
+
+        return DataLoader(sub,
+                          shuffle=True,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers)
+
+    def val_dataloader_by_class(self, class_filter):
+        """
+        Like val_dataloader(), but only keeps those val examples whose 3-way label == class_filter.
+        """
+        from torch.utils.data import Subset, DataLoader
+
+        class_filter = int(class_filter)
+        base_ds  = self.val_set.dataset   # this is your Dataset instance
+        val_idxs = self.val_set.indices   # the row‐indices into base_ds
+
+        # n.b. we pull the precomputed label out of each sample
+        keep = []
+        for idx in val_idxs:
+            lbl = base_ds[idx]["label"].item()
+            if lbl == class_filter:
+                keep.append(idx)
+
+        if not keep:
+            raise ValueError(f"No validation samples for class_filter={class_filter}")
+
+        subset = Subset(base_ds, keep)
+        return DataLoader(
+            subset,
+            batch_size  = self.batch_size,
+            shuffle     = False,
+            num_workers = self.num_workers,
+        )
 
 class ConcatDataModule():
     def __init__(self,
@@ -432,4 +500,5 @@ class ConcatDataModule():
         self.planification = [p.train_dataloader() for p in self.planification if p is not None]
         self.save_planification()
 
-    
+
+

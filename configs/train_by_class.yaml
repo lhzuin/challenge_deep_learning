@@ -4,18 +4,18 @@ version_base: 1.1
 defaults:
     - _self_
     - dataset: default
-    - optim: adamw
+    - optim: adamw_by_class
     - model: siglip_distilbert_lora
     - loss_fn: mse # Change for msle if not log or mse if log
 
-epochs: 8 #50 / 35
+epochs: 6 #50 / 35
 
 
 early_stopping:
   patience: 2
   min_epochs: 7
 use_warmup: true
-warmup_fraction: 0.02
+warmup_fraction: 0.05
 unfreeze_fraction: 0.15 #not used
 layer_decay: ${if:${dataset.train_on_log}, 0.9, 0.8}
 log: True
@@ -44,9 +44,9 @@ datamodule:
 accum_steps: ${dataset.accum_steps}
 data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}
-checkpoint_path: ${root_dir}/checkpoints/${experiment_name}.pt
+checkpoint_path: ${root_dir}/checkpoints/${experiment_name}_${class_filter}.pt
 
-class_filter: 0 # low
+class_filter: 2 # low
 #class_filter: 1  # normal
 #class_filter: 2  # high
 
