@@ -19,6 +19,7 @@ from utils.sanity import show_images
 import signal
 import sys
 import os
+OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 def get_text_blocks(peft_model):
     """
