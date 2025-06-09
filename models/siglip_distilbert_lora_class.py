@@ -33,8 +33,8 @@ class SigLIPDistilBertLoraClass(nn.Module):
         vision_lora_cfg = LoraConfig(
             r=8,
             lora_alpha=16,          
-            target_modules=["qkv"],  # this covers the fused qkv projection
-            lora_dropout=0.05,       # renamed from dropout
+            target_modules=["qkv"], 
+            lora_dropout=0.05,     
             bias="none",
             task_type="FEATURE_EXTRACTION",
         )
@@ -108,7 +108,6 @@ class SigLIPDistilBertLoraClass(nn.Module):
             year_proj_dim   +
             cy_hidden
         )
-        #self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Dropout(p=0.1), nn.Linear(joint_dim,1))
         self.head = nn.Sequential(
             nn.LayerNorm(joint_dim),
             nn.Dropout(head_dropout),
@@ -116,7 +115,6 @@ class SigLIPDistilBertLoraClass(nn.Module):
             nn.ReLU(),
             nn.Dropout(head_dropout),
             nn.Linear(head_hidden_dim, 3),
-            #nn.Softmax() 
         )
         
         for name, p in self.named_parameters():

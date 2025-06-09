@@ -8,7 +8,7 @@ defaults:
     - model: siglip_distilbert_lora
     - loss_fn: mse # Change for msle if not log or mse if log
 
-epochs: 6 #50 / 35
+epochs: 6
 
 
 early_stopping:
@@ -46,7 +46,5 @@ data_dir: ${root_dir}/dataset/
 root_dir:  ${hydra:runtime.cwd}
 checkpoint_path: ${root_dir}/checkpoints/${experiment_name}_${class_filter}.pt
 
-class_filter: 2 # low
-#class_filter: 1  # normal
-#class_filter: 2  # high
+class_filter: 2 # high
 

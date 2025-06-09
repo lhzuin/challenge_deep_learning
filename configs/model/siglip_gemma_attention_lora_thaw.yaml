@@ -16,8 +16,8 @@ name: SIGLIP_GEMMA_ATTENTION_LORA_LOG_THAW
 
 
 datamodule:
-  batch_size: 32      # your physical per-GPU batch
-  accum_steps: 4      # 32×4 = 128 effective
+  batch_size: 32
+  accum_steps: 4
 
 # Normal train
 num_epochs_phase1: 6

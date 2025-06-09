@@ -1,24 +1,21 @@
 import os
-os.environ["TOKENIZERS_PARALLELISM"] = "false"  # ← AJOUTE CETTE LIGNE
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from PIL import Image
 import wandb
 import hydra
 from torch import cuda, device as torch_device, save as torch_save, no_grad, zeros
-from torch import Tensor,save
 from torch.cuda import empty_cache, ipc_collect
-from torch.nn import Module
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
-import numpy as np
 from torch.amp import autocast, GradScaler
 
 from utils.sanity import show_images
 import signal
 import sys
 import os
+import torch
 OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
 def get_text_blocks(peft_model):
@@ -166,13 +163,10 @@ def train(cfg):
         fusion_params = list(model.fusion_transformer.parameters())
         param_groups.append({
             "params": fusion_params,
-            "lr": lr_fusion,   # or a small fraction of lr_body if you prefer
+            "lr": lr_fusion, 
         })
     seen = set()
     for g in param_groups:
-        #uniq = [p for p in g["params"] if id(p) not in seen]
-        #g["params"] = uniq                      # drop dups in-place
-        #seen.update(map(id, uniq))
         # split into decay vs no_decay
         decay, no_decay = [], []
         for p in g["params"]:
@@ -259,8 +253,6 @@ def train(cfg):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            #loss.backward()
-            #optimizer.step()
             if cfg.use_warmup:
                 scheduler.step()
                 if logger is not None:

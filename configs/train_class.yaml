@@ -8,7 +8,7 @@ defaults:
     - model: siglip_distilbert_lora_class
     - loss_fn: cross_entropy
 
-epochs: 2 #50 / 35
+epochs: 2
 
 
 early_stopping:

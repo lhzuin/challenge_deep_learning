@@ -5,13 +5,10 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
 from torch.amp import autocast, GradScaler
-from torch.utils.data import WeightedRandomSampler
-import numpy as np
 
 from utils.sanity import show_images
 import signal, sys
 import os
-from PIL import Image
 
 OmegaConf.register_new_resolver("if", lambda cond, a, b: a if cond else b)
 
@@ -153,8 +150,6 @@ def train(cfg):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            #loss.backward()
-            #optimizer.step()
             if cfg.use_warmup:
                 scheduler.step()
                 if logger is not None:

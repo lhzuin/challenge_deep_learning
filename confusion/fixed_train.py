@@ -79,7 +79,7 @@ def train(cfg):
     
 
 
-    text_blocks = model.text_encoder.transformer.layer  # or .resblocks, depending on your model
+    text_blocks = model.text_encoder.transformer.layer
     num_text_blocks = len(text_blocks)
     for depth, module in enumerate(text_blocks):
         layer_lr = body_lr * (decay ** (num_text_blocks - depth - 1))
@@ -119,9 +119,10 @@ def train(cfg):
     
 
     
-    #datamodule = pickle.load(open("confusion/datamodule.pkl", "rb"))
-    datamodule= pickle.load(open("confusion/datamodule.pkl", "rb"))
-    #datamodule = hydra.utils.instantiate(cfg.datamodule)
+    try:
+        datamodule= pickle.load(open("confusion/datamodule.pkl", "rb"))
+    except Exception:
+        datamodule = hydra.utils.instantiate(cfg.datamodule)
     train_loader = datamodule.train_dataloader()
     val_loader   = datamodule.val_dataloader()
     train_transform = hydra.utils.instantiate(cfg.datamodule.train_transform)

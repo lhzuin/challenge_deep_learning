@@ -33,7 +33,7 @@ class SigLIPDistilBert(nn.Module):
             r=8,
             lora_alpha=16,          
             target_modules=["qkv"],  # this covers the fused qkv projection
-            lora_dropout=0.05,       # renamed from dropout
+            lora_dropout=0.05,
             bias="none",
             task_type="FEATURE_EXTRACTION",
         )
@@ -87,10 +87,7 @@ class SigLIPDistilBert(nn.Module):
        
         # ── channel embedding ────────────────────────────────────
         self.ch_emb = nn.Embedding(num_channels, ch_emb_dim)
-       
-        # ── bucketed year embedding ─────────────────────────────
-        #self.year_emb  = nn.Embedding(num_year_buckets, year_emb_dim)
-
+ 
         # ── date features MLP ───────────────────────────────────
         self.date_proj = nn.Sequential(
             nn.Linear(6, date_proj_dim),
@@ -104,11 +101,10 @@ class SigLIPDistilBert(nn.Module):
             3*D             +  # image + text
             ch_emb_dim      +
             year_proj_dim   +
-            #year_emb_dim    +
             date_proj_dim   +
             cy_hidden
         )
-        #self.head = nn.Sequential(nn.LayerNorm(joint_dim), nn.Dropout(p=0.1), nn.Linear(joint_dim,1))
+
         self.head = nn.Sequential(
             nn.LayerNorm(joint_dim),
             nn.Dropout(head_dropout),
@@ -116,7 +112,6 @@ class SigLIPDistilBert(nn.Module):
             nn.ReLU(),
             nn.Dropout(head_dropout),
             nn.Linear(head_hidden_dim, 1),  
-            #nn.Softplus()
         )
 
     # ------------------------------------------------------------------ #
@@ -151,12 +146,8 @@ class SigLIPDistilBert(nn.Module):
         cy_in = torch.cat([ch_f, yr_f], dim=1)
         cy_f  = self.cy_proj(cy_in)
         joint_f.append(cy_f)
-
-        # Year bucket
-        #yr_emb_f = self.year_emb(batch["year_idx"].to(img_f.device))   # [B, year_emb_dim]
-        #joint_f.append(yr_emb_f)
        
-        # 3) date flags
+  
         date = torch.cat([batch[k].to(img_f.device) for k in
             ["m_sin","m_cos","d_sin","d_cos","h_sin","h_cos"]], dim=1)
         date_f = self.date_proj(date)
