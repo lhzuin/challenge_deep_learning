@@ -39,14 +39,14 @@ class SigLIPGemmaAttentionLoraLog(nn.Module):
             r=8,
             lora_alpha=16,          
             target_modules=["qkv"],  # this covers the fused qkv projection
-            lora_dropout=0.1,       # renamed from dropout
+            lora_dropout=0.1,    
             bias="none",
             task_type="FEATURE_EXTRACTION",
         )
         self.img_encoder = get_peft_model(self.img_encoder, vision_lora_cfg)
 
         for name, p in self.img_encoder.named_parameters(): 
-            if "lora_" not in name:                          # …except LoRA
+            if "lora_" not in name:               
                 p.requires_grad = False
 
         # compute the embedding dimension by doing a dummy pass
@@ -63,7 +63,7 @@ class SigLIPGemmaAttentionLoraLog(nn.Module):
                 gemma_name,
                 device_map="auto",
                 quantization_config=bnb_cfg,
-                attn_implementation="eager",   # Gemma3 warning → eager attn
+                attn_implementation="eager",  
                 trust_remote_code=True,
                 token=token
         )
@@ -189,15 +189,7 @@ class SigLIPGemmaAttentionLoraLog(nn.Module):
         out_sum   = self.text_encoder(**tok_sum, output_hidden_states=True)
         h_sum     = out_sum.hidden_states[-1][:, 0].to(self.sum_proj.weight.dtype)
         s_f       = self.sum_proj(h_sum) 
-        #out_sum = self.text_encoder(**tok_sum)
-        #s_f = self.sum_proj(out_sum.last_hidden_state[:,0])
-        """
-        out_title = self.text_encoder(**tok_title)
-        out_sum = self.text_encoder(**tok_sum)
 
-        t_f = self.title_proj(out_title.last_hidden_state[:,0])
-        s_f = self.sum_proj(out_sum.last_hidden_state[:,0])
-        """
         yr_norm = batch["year_norm"].to(img_f.device)       # [B,1]
         yr_f = self.year_proj(yr_norm) 
 

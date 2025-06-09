@@ -26,8 +26,8 @@ class BLIP2Regressor(nn.Module):
         txt = self.processor.tokenizer(
             batch["text"],
             padding=True,
-            truncation=True,          # still True
-            max_length=128,           # (optional) keeps memory low
+            truncation=True,          
+            max_length=128,    
             return_tensors="pt"
         ).to(device)
 
@@ -35,7 +35,7 @@ class BLIP2Regressor(nn.Module):
             pixel_values=pixel_values,
             input_ids=txt.input_ids,
             attention_mask=txt.attention_mask,
-            return_dict=True          # <- *do not* request hidden-states
+            return_dict=True      
         )
 
         # ---- robust pooling for every transformers version ----

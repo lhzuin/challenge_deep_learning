@@ -16,7 +16,6 @@ def mec(cfg_model):
     # Ensure the model is instantiated correctly from the config
     model = hydra.utils.instantiate(cfg_model.model.instance).to(device)
     checkpoint = torch.load(cfg_model.checkpoint_path, map_location=device)
-    #print(checkpoint.keys() if isinstance(checkpoint, dict) else type(checkpoint))
     if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:

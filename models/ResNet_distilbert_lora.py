@@ -24,20 +24,6 @@ class ResNetDistilBert(nn.Module):
         resnet.fc = nn.Identity()  # remove classification head
         self.img_encoder = resnet
 
-        # --- Add LoRA to ResNet Conv2d layers ---
-        """
-        resnet_lora_cfg = LoraConfig(
-            r=8,
-            lora_alpha=16,
-            target_modules=["conv1", "conv2", "conv3"],  # typical conv names in ResNet blocks
-            lora_dropout=0.05,
-            bias="none",
-            task_type="FEATURE_EXTRACTION",
-        )
-        # Apply LoRA to all Conv2d layers in ResNet
-        self.img_encoder = get_peft_model(self.img_encoder, resnet_lora_cfg)
-        """
-
         # compute the embedding dimension by doing a dummy pass
         with torch.no_grad():
             dummy = torch.zeros(1, 3, 224, 224)

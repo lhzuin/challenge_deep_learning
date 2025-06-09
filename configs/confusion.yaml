@@ -7,7 +7,7 @@ defaults:
     - model: siglip_gemma_attention_lora
     - loss_fn: msle
 
-epochs: 4 #50 / 35
+epochs: 4
 
 early_stopping:
   patience: 1

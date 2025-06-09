@@ -119,7 +119,7 @@ class SigLIPDistilBertLoraThaw(nn.Module):
 
         # ── regression head ──────────────────────────────────────
         joint_dim = (
-            3*D             +  # image + text
+            3*D             + 
             ch_emb_dim      +
             year_proj_dim   +
             date_proj_dim   +
@@ -167,11 +167,8 @@ class SigLIPDistilBertLoraThaw(nn.Module):
         cy_f  = self.cy_proj(cy_in)
         joint_f.append(cy_f)
 
-        # Year bucket
-        #yr_emb_f = self.year_emb(batch["year_idx"].to(img_f.device))   # [B, year_emb_dim]
-        #joint_f.append(yr_emb_f)
        
-        # 3) date flags
+        # date flags
         date = torch.cat([batch[k].to(img_f.device) for k in
             ["m_sin","m_cos","d_sin","d_cos","h_sin","h_cos"]], dim=1)
         date_f = self.date_proj(date)

@@ -9,10 +9,10 @@ class SigLIPRegressor(nn.Module):
         frozen=True,
         # ───── progressive-unfreeze knobs (YAML-controllable) ─────
         unfreeze_enable=False,
-        unfreeze_epoch_fraction=None,      # e.g. 3
+        unfreeze_epoch_fraction=None, 
         total_epochs=None,
-        unfreeze_top_blocks=2,           # how many ViT / text blocks
-        unfreeze_proj=True,              # also turn on .proj/.text_projection
+        unfreeze_top_blocks=2,
+        unfreeze_proj=True,      
         ):
         super().__init__()
         if unfreeze_enable:

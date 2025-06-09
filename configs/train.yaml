@@ -5,7 +5,7 @@ defaults:
     - _self_
     - dataset: default
     - optim: adamw
-    - model: siglip_gemma_attention_lora_log
+    - model: siglip_distilbert_lora
     - loss_fn: msle # Change for msle if not log or mse if log
 
 epochs: 9 

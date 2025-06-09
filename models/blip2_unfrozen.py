@@ -8,7 +8,7 @@ class BLIP2Regressor(nn.Module):
         model_name: str = "Salesforce/blip2-opt-2.7b",
         frozen: bool = True,
         unfreeze_enable: bool = False,
-        unfreeze_after_epochs: int | None = None,   # e.g. 3
+        unfreeze_after_epochs: int | None = None, 
         unfreeze_top_blocks:   int = 4,
     ):
         super().__init__()
@@ -28,7 +28,7 @@ class BLIP2Regressor(nn.Module):
         hidden = self.backbone.config.qformer_config.hidden_size
         self.head = nn.Sequential(nn.LayerNorm(hidden), nn.Linear(hidden, 1))
 
-        # ▸ progressive-unfreeze bookkeeping
+        # progressive-unfreeze bookkeeping
         self._unfreeze_cfg = {
             "enable": unfreeze_enable,
             "after_epochs": unfreeze_after_epochs,
@@ -38,18 +38,12 @@ class BLIP2Regressor(nn.Module):
         self._current_epoch = 0
         self._did_unfreeze = False
 
-    # ------------------------------------------------------------------ #
-    # public helpers (called *implicitly* from train.py — no edit needed) #
-    # ------------------------------------------------------------------ #
 
     def epoch_scheduler_hook(self):
         """Call this once per epoch."""
         self._current_epoch += 1
         self._maybe_unfreeze()
 
-    # ------------------------------------------------------------------ #
-    # internal                                                            #
-    # ------------------------------------------------------------------ #
     def _maybe_unfreeze(self):
         if self._did_unfreeze or not self._unfreeze_cfg["enable"]:
             return
@@ -69,9 +63,6 @@ class BLIP2Regressor(nn.Module):
         for layer in layers[-n:]:
             layer.requires_grad_(True)
 
-    # ------------------------------------------------------------------ #
-    # forward (unchanged except hook call)                               #
-    # ------------------------------------------------------------------ #
     def forward(self, batch):
         device = next(self.parameters()).device
 

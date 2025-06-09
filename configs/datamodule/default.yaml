@@ -1,0 +1,12 @@
+
+_target_: data.datamodule.DataModule
+dataset_path: ${hydra:runtime.cwd}/dataset/
+train_transform: ${dataset.train_transform}
+test_transform: ${dataset.val_transform}
+batch_size: ${dataset.batch_size}
+num_workers: ${dataset.num_workers}
+metadata: ${dataset.metadata}
+val_ratio: ${dataset.val_ratio}
+seed: ${dataset.seed}
+train_on_log: ${dataset.train_on_log}
+augmentation: ${dataset.augmentation}

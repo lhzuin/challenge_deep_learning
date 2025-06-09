@@ -1,4 +1,3 @@
-# data/wrappers.py
 import numpy as np, torch
 
 class RandomPerIdDataset(torch.utils.data.Dataset):
@@ -10,19 +9,19 @@ class RandomPerIdDataset(torch.utils.data.Dataset):
     Nothing else changes - all numeric tensors come from the inner Dataset.
     """
     def __init__(self, base_dataset, mix_fields=("title", "summary")):
-        self.base = base_dataset                 # <- your old Dataset instance
+        self.base = base_dataset
         self.mix_fields = mix_fields
 
         # -- group dataframe rows by base_id once ---------------------------
-        df = self.base.info                      # <= already loaded dataframe
+        df = self.base.info  
         self.groups = (
             df.groupby("Unnamed: 0", sort=False)
-              .apply(lambda g: g.index.to_numpy())   # ndarray of row-indices
+              .apply(lambda g: g.index.to_numpy()) 
               .to_dict()
         )
         self.base_ids = list(self.groups.keys())
 
-        self.rng = np.random.default_rng()       # own RNG → easy reseed/epoch
+        self.rng = np.random.default_rng() 
 
     # ----------------------------------------------------------------------
     def __len__(self):
@@ -34,7 +33,7 @@ class RandomPerIdDataset(torch.utils.data.Dataset):
 
         # --- one random row for the *image* and all numeric tensors --------
         idx_img = int(self.rng.choice(rows))
-        sample  = self.base[idx_img]             # dict already converted
+        sample  = self.base[idx_img] 
 
         # --- independently mix specified text fields ----------------------
         for field in self.mix_fields:

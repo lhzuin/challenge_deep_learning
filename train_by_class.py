@@ -5,8 +5,6 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 from transformers import get_cosine_schedule_with_warmup
 from torch.amp import autocast, GradScaler
-
-from utils.sanity import show_images
 import signal, sys
 import os
 from PIL import Image
@@ -89,7 +87,6 @@ def train(cfg):
     
     except AttributeError:
         num_blocks = len(model.img_encoder1.visual.trunk.blocks)
-        # collect all transformer blocks, assign lr = lr_body * decay**(depth)
         for depth, module in enumerate(model.img_encoder1.visual.trunk.blocks):
             
             param_groups.append({
@@ -98,7 +95,7 @@ def train(cfg):
             })
 
     # ───────── text blocks for layer-decay LR ─────────
-    text_blocks = get_text_blocks(model.text_encoder)  # your helper
+    text_blocks = get_text_blocks(model.text_encoder)  
     if any(p.requires_grad for p in model.text_encoder.base_model.parameters()):
         num_text_blocks = len(text_blocks)
         for depth, module in enumerate(text_blocks):
@@ -151,7 +148,6 @@ def train(cfg):
         for p in g["params"]:
             if id(p) in seen: continue
             seen.add(id(p))
-            # any 1D param is bias or LayerNorm weight → no decay
             if p.ndim == 1:
                 no_decay.append(p)
             else:
@@ -230,8 +226,6 @@ def train(cfg):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            #loss.backward()
-            #optimizer.step()
             if cfg.use_warmup:
                 scheduler.step()
                 if logger is not None:
